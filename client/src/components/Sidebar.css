@@ -1,0 +1,78 @@
+.sidebar {
+  width: 260px;
+  background: #0f172a;
+  color: white;
+  padding: 15px;
+  height: 100vh;
+  overflow-y: auto;
+}
+
+.sidebar h3 {
+  margin-bottom: 10px;
+}
+
+.newChatBtn {
+  width: 100%;
+  padding: 10px;
+  margin-bottom: 15px;
+  background: #2563eb;
+  border: none;
+  color: white;
+  border-radius: 8px;
+  cursor: pointer;
+  font-weight: bold;
+}
+
+.historyList {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.historyCard {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  background: #1e293b;
+  padding: 10px;
+  border-radius: 10px;
+  cursor: pointer;
+  transition: 0.2s;
+}
+
+.historyCard:hover {
+  background: #334155;
+  transform: scale(1.02);
+}
+
+.historyContent {
+  flex: 1;
+}
+
+.historyTitle {
+  font-size: 14px;
+  font-weight: bold;
+  margin-bottom: 4px;
+}
+
+.historyPreview {
+  font-size: 12px;
+  opacity: 0.7;
+}
+
+.deleteBtn {
+  background: transparent;
+  border: none;
+  color: red;
+  cursor: pointer;
+  font-size: 16px;
+}
+
+.overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  background: rgba(0,0,0,0.4);
+}
