@@ -1,3 +1,4 @@
+<<<<<<< HEAD
 # ===== DEPENDENCIES =====
 node_modules/
 .pnp
@@ -54,3 +55,6 @@ coverage/
 *.pem
 .cache/
 .temp/
+=======
+.env
+>>>>>>> 77aa08766721ed5e49432d7bbd5ea4adea1050f5
