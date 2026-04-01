@@ -131,6 +131,7 @@ function App() {
         onNewChat={handleNewChat}
         activeChatIndex={activeChatIndex}
         notesHistory={notesHistory}
+        setNotesHistory={setNotesHistory}
         onSelectNotes={handleSelectNotes}
         activeNotesIndex={activeNotesIndex}
         open={sidebarOpen}

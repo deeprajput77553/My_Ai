@@ -3,7 +3,7 @@ import "./Sidebar.css";
 
 function Sidebar({
   chats, setChats, onSelectChat, onNewChat, activeChatIndex,
-  notesHistory, onSelectNotes, activeNotesIndex,
+  notesHistory, setNotesHistory, onSelectNotes, activeNotesIndex,
   open, setOpen,
 }) {
 
@@ -16,6 +16,12 @@ function Sidebar({
     } catch (err) {
       console.error("Delete failed:", err);
     }
+  };
+
+  const handleDeleteNote = (e, index) => {
+    e.stopPropagation();
+    setNotesHistory((prev) => prev.filter((_, i) => i !== index));
+    if (activeNotesIndex === index) onSelectNotes(null);
   };
 
   return (
@@ -89,6 +95,11 @@ function Sidebar({
                     </div>
                     <div className="historyPreview">{note.timestamp}</div>
                   </div>
+                  <button
+                    className="deleteBtn"
+                    onClick={(e) => handleDeleteNote(e, i)}
+                    title="Delete"
+                  >🗑</button>
                 </div>
               ))
             )}
