@@ -2,17 +2,19 @@ import { deleteChat } from "../api";
 import "./Sidebar.css";
 
 function Sidebar({
-  chats, setChats, onSelectChat, onNewChat, activeChatIndex,
-  notesHistory, setNotesHistory, onSelectNotes, activeNotesIndex,
+  conversations, setConversations,
+  onSelectChat, onNewChat, activeConvId,
+  notesHistory, setNotesHistory,
+  onSelectNotes, activeNotesIndex,
   open, setOpen,
 }) {
 
-  const handleDeleteChat = async (e, id, index) => {
+  const handleDeleteChat = async (e, id) => {
     e.stopPropagation();
     try {
       await deleteChat(id);
-      setChats((prev) => prev.filter((_, i) => i !== index));
-      if (activeChatIndex === index) onNewChat();
+      setConversations((prev) => prev.filter((c) => c._id !== id));
+      if (activeConvId === id) onNewChat();
     } catch (err) {
       console.error("Delete failed:", err);
     }
@@ -22,6 +24,18 @@ function Sidebar({
     e.stopPropagation();
     setNotesHistory((prev) => prev.filter((_, i) => i !== index));
     if (activeNotesIndex === index) onSelectNotes(null);
+  };
+
+  // Get preview text from last AI message in conversation
+  const getPreview = (conv) => {
+    const msgs = conv.messages || [];
+    const lastAi = [...msgs].reverse().find((m) => m.role === "ai");
+    return lastAi?.content?.slice(0, 45) || "No messages yet";
+  };
+
+  const getMsgCount = (conv) => {
+    const msgs = conv.messages || [];
+    return Math.floor(msgs.length / 2); // pairs
   };
 
   return (
@@ -39,35 +53,34 @@ function Sidebar({
           <span>＋</span> New Chat
         </button>
 
-        {/* Scrollable body */}
         <div className="sidebarBody">
 
-          {/* ── Chat History ── */}
+          {/* ── Chat Conversations ── */}
           <div className="sectionLabel">💬 Chats</div>
           <div className="historyList">
-            {chats.length === 0 ? (
+            {conversations.length === 0 ? (
               <div className="emptyState">No chats yet</div>
             ) : (
-              chats.map((chat, i) => (
+              conversations.map((conv) => (
                 <div
-                  key={chat._id || i}
-                  className={`historyCard ${activeChatIndex === i ? "active" : ""}`}
-                  onClick={() => { onSelectChat(i); setOpen(false); }}
+                  key={conv._id}
+                  className={`historyCard ${activeConvId === conv._id ? "active" : ""}`}
+                  onClick={() => { onSelectChat(conv); setOpen(false); }}
                 >
                   <div className="historyContent">
                     <div className="historyTitle">
-                      {chat.userMessage.length > 32
-                        ? chat.userMessage.slice(0, 32) + "…"
-                        : chat.userMessage}
+                      {conv.title?.length > 30
+                        ? conv.title.slice(0, 30) + "…"
+                        : conv.title || "New conversation"}
                     </div>
                     <div className="historyPreview">
-                      {chat.aiMessage?.slice(0, 42)}…
+                      {getPreview(conv)}… · {getMsgCount(conv)} msg{getMsgCount(conv) !== 1 ? "s" : ""}
                     </div>
                   </div>
                   <button
                     className="deleteBtn"
-                    onClick={(e) => handleDeleteChat(e, chat._id, i)}
-                    title="Delete"
+                    onClick={(e) => handleDeleteChat(e, conv._id)}
+                    title="Delete conversation"
                   >🗑</button>
                 </div>
               ))
@@ -89,8 +102,8 @@ function Sidebar({
                 >
                   <div className="historyContent">
                     <div className="historyTitle">
-                      {note.prompt.length > 32
-                        ? note.prompt.slice(0, 32) + "…"
+                      {note.prompt.length > 30
+                        ? note.prompt.slice(0, 30) + "…"
                         : note.prompt}
                     </div>
                     <div className="historyPreview">{note.timestamp}</div>
@@ -98,7 +111,7 @@ function Sidebar({
                   <button
                     className="deleteBtn"
                     onClick={(e) => handleDeleteNote(e, i)}
-                    title="Delete"
+                    title="Delete note"
                   >🗑</button>
                 </div>
               ))

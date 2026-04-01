@@ -1,5 +1,5 @@
 import { useEffect, useState, useRef, useCallback } from "react";
-import { sendMessage, getChats } from "./api";
+import { sendMessage, getChats, getConversation } from "./api";
 import Sidebar from "./components/Sidebar";
 import Notes from "./components/Notes";
 import SourcesPanel from "./components/SourcesPanel";
@@ -35,74 +35,112 @@ function TypingMessage({ text, onDone }) {
 
 // ── App ───────────────────────────────────────────────────────────────────────
 function App() {
-  const [tab, setTab]                             = useState("chat");
-  const [message, setMessage]                     = useState("");
-  const [chats, setChats]                         = useState([]);
-  const [activeChatIndex, setActiveChatIndex]     = useState(null);
-  const [displayedChats, setDisplayedChats]       = useState([]);
+  const [tab, setTab]                           = useState("chat");
+  const [message, setMessage]                   = useState("");
 
-  // Per-message search data: { [chatId]: { searchResults, images, searchQuery } }
-  const [chatMeta, setChatMeta]                   = useState({});
+  // Sidebar conversations list
+  const [conversations, setConversations]       = useState([]);
 
-  const [loading, setLoading]                     = useState(false);
-  const [sidebarOpen, setSidebarOpen]             = useState(false);
-  const [typingId, setTypingId]                   = useState(null);
-  const [notesHistory, setNotesHistory]           = useState([]);
-  const [activeNotesIndex, setActiveNotesIndex]   = useState(null);
-  const [loadedNote, setLoadedNote]               = useState(null);
+  // Active conversation
+  const [conversationId, setConversationId]     = useState(null); // MongoDB _id
+  const [displayedMessages, setDisplayedMessages] = useState([]); // { role, content, _id? }
+
+  // Per-message search meta { tempId/index: { searchResults, images, searchQuery } }
+  const [msgMeta, setMsgMeta]                   = useState({});
+
+  const [loading, setLoading]                   = useState(false);
+  const [sidebarOpen, setSidebarOpen]           = useState(false);
+  const [typingIndex, setTypingIndex]           = useState(null); // index in displayedMessages
+
+  // Notes
+  const [notesHistory, setNotesHistory]         = useState([]);
+  const [activeNotesIndex, setActiveNotesIndex] = useState(null);
+  const [loadedNote, setLoadedNote]             = useState(null);
 
   const bottomRef        = useRef(null);
-  const handleTypingDone = useCallback(() => setTypingId(null), []);
+  const handleTypingDone = useCallback(() => setTypingIndex(null), []);
 
+  // Load conversation list on mount
   useEffect(() => {
     const load = async () => {
       const res = await getChats();
-      setChats(res.data);
-      setDisplayedChats(res.data);
+      setConversations(res.data);
     };
     load();
   }, []);
 
   useEffect(() => {
     bottomRef.current?.scrollIntoView({ behavior: "smooth" });
-  }, [displayedChats, loading]);
+  }, [displayedMessages, loading]);
 
-  // ── Chat handlers ─────────────────────────────────────────────────────────
-  const handleSelectChat = (index) => {
-    setActiveChatIndex(index);
-    setDisplayedChats([chats[index]]);
-    setTypingId(null);
-    setTab("chat");
+  // ── Select a conversation from sidebar ───────────────────────────────────
+  const handleSelectChat = async (conv) => {
+    try {
+      const res = await getConversation(conv._id);
+      const fullConv = res.data;
+
+      // Convert messages array into display format
+      // Pair up user+ai messages for rendering
+      const msgs = fullConv.messages.map((m, i) => ({
+        ...m,
+        _displayId: `${fullConv._id}_${i}`,
+      }));
+
+      setConversationId(fullConv._id);
+      setDisplayedMessages(msgs);
+      setTypingIndex(null);
+      setMsgMeta({});
+      setTab("chat");
+    } catch (err) {
+      console.error("Failed to load conversation:", err);
+    }
   };
 
+  // ── New chat ──────────────────────────────────────────────────────────────
   const handleNewChat = () => {
-    setActiveChatIndex(null);
-    setDisplayedChats([]);
+    setConversationId(null);
+    setDisplayedMessages([]);
     setMessage("");
-    setTypingId(null);
+    setTypingIndex(null);
+    setMsgMeta({});
   };
 
+  // ── Send message ──────────────────────────────────────────────────────────
   const handleSend = async () => {
     if (!message.trim()) return;
     setLoading(true);
     const userText = message;
     setMessage("");
+
+    // Optimistically add user message
+    const userMsg = { role: "user", content: userText, _displayId: `temp_user_${Date.now()}` };
+    setDisplayedMessages((prev) => [...prev, userMsg]);
+
     try {
-      const res = await sendMessage(userText);
-      const { searchResults, images, searchQuery, webEnhanced, ...chat } = res.data;
+      const res = await sendMessage(userText, conversationId);
+      const { conversationId: newConvId, aiMessage, searchResults, images, searchQuery, webEnhanced } = res.data;
 
-      setChats((prev) => [...prev, chat]);
-      setActiveChatIndex(null);
-      setDisplayedChats((prev) => [...prev, chat]);
-      setTypingId(chat._id);
+      // Set/update conversation ID
+      setConversationId(newConvId);
 
-      // Store search meta keyed by chat _id
-      if (webEnhanced && chat._id) {
-        setChatMeta((prev) => ({
+      // Add AI message
+      const aiMsg = { role: "ai", content: aiMessage, _displayId: `ai_${Date.now()}` };
+      const aiIndex = displayedMessages.length + 1; // index after optimistic user msg
+      setDisplayedMessages((prev) => [...prev, aiMsg]);
+      setTypingIndex(aiIndex);
+
+      // Store search meta
+      if (webEnhanced) {
+        setMsgMeta((prev) => ({
           ...prev,
-          [chat._id]: { searchResults, images, searchQuery },
+          [aiMsg._displayId]: { searchResults, images, searchQuery },
         }));
       }
+
+      // Refresh sidebar conversation list
+      const listRes = await getChats();
+      setConversations(listRes.data);
+
     } catch (err) {
       console.error(err);
     }
@@ -116,8 +154,7 @@ function App() {
   // ── Notes history ─────────────────────────────────────────────────────────
   const handleNotesSaved = (prompt, notes) => {
     const entry = {
-      prompt,
-      notes,
+      prompt, notes,
       timestamp: new Date().toLocaleString("en-IN", {
         day: "2-digit", month: "short", hour: "2-digit", minute: "2-digit",
       }),
@@ -127,20 +164,30 @@ function App() {
   };
 
   const handleSelectNotes = (index) => {
+    if (index === null) { setActiveNotesIndex(null); setLoadedNote(null); return; }
     setActiveNotesIndex(index);
     setLoadedNote(notesHistory[index]);
     setTab("notes");
   };
 
+  // ── Pair messages for rendering (user → ai pairs) ────────────────────────
+  // displayedMessages is a flat array of {role, content} — render them in pairs
+  const messagePairs = [];
+  for (let i = 0; i < displayedMessages.length; i += 2) {
+    const userM = displayedMessages[i];
+    const aiM   = displayedMessages[i + 1];
+    messagePairs.push({ userM, aiM, pairIndex: i });
+  }
+
   return (
     <div className="app">
 
       <Sidebar
-        chats={chats}
-        setChats={setChats}
+        conversations={conversations}
+        setConversations={setConversations}
         onSelectChat={handleSelectChat}
         onNewChat={handleNewChat}
-        activeChatIndex={activeChatIndex}
+        activeConvId={conversationId}
         notesHistory={notesHistory}
         setNotesHistory={setNotesHistory}
         onSelectNotes={handleSelectNotes}
@@ -151,7 +198,7 @@ function App() {
 
       <div className="main">
 
-        {/* ── Sticky topbar ── */}
+        {/* Sticky topbar */}
         <div className="topbar">
           <button className="menuBtn" onClick={() => setSidebarOpen(true)}>☰</button>
           <h2>OLLAMA AI</h2>
@@ -171,43 +218,52 @@ function App() {
         {tab === "chat" && (
           <>
             <div className="chatBox">
-              {displayedChats.length === 0 && !loading && (
+              {displayedMessages.length === 0 && !loading && (
                 <div style={{ margin: "auto", textAlign: "center", color: "#475569", fontSize: "14px" }}>
                   <div style={{ fontSize: "40px", marginBottom: "12px" }}>✨</div>
                   Ask me anything to get started.
                 </div>
               )}
 
-              {displayedChats.map((chat, i) => {
-                const meta = chatMeta[chat._id];
-                return (
-                  <div key={chat._id || i} className="messageBlock">
-                    <div className="userRow">
-                      <div className="userMsg">{chat.userMessage}</div>
-                    </div>
-                    <div className="aiRow">
-                      <div className="aiMsg">
-                        {chat._id === typingId ? (
-                          <TypingMessage text={chat.aiMessage} onDone={handleTypingDone} />
-                        ) : (
-                          chat.aiMessage
-                        )}
-                      </div>
-                    </div>
+              {messagePairs.map(({ userM, aiM, pairIndex }) => (
+                <div key={userM?._displayId || pairIndex} className="messageBlock">
 
-                    {/* Sources panel — only if web search was used */}
-                    {meta && (
-                      <div className="aiRow" style={{ maxWidth: "70%" }}>
-                        <SourcesPanel
-                          searchResults={meta.searchResults}
-                          images={meta.images}
-                          searchQuery={meta.searchQuery}
-                        />
+                  {/* User message */}
+                  {userM && (
+                    <div className="userRow">
+                      <div className="userMsg">{userM.content}</div>
+                    </div>
+                  )}
+
+                  {/* AI message */}
+                  {aiM && (
+                    <>
+                      <div className="aiRow">
+                        <div className="aiMsg">
+                          {pairIndex + 1 === typingIndex ? (
+                            <TypingMessage text={aiM.content} onDone={handleTypingDone} />
+                          ) : (
+                            aiM.content
+                          )}
+                        </div>
                       </div>
-                    )}
-                  </div>
-                );
-              })}
+
+                      {/* Sources panel */}
+                      {msgMeta[aiM._displayId] && (
+                        <div className="aiRow">
+                          <div style={{ maxWidth: "70%", width: "100%" }}>
+                            <SourcesPanel
+                              searchResults={msgMeta[aiM._displayId].searchResults}
+                              images={msgMeta[aiM._displayId].images}
+                              searchQuery={msgMeta[aiM._displayId].searchQuery}
+                            />
+                          </div>
+                        </div>
+                      )}
+                    </>
+                  )}
+                </div>
+              ))}
 
               {loading && (
                 <div className="aiRow">
@@ -241,7 +297,6 @@ function App() {
             preloadedNote={loadedNote}
           />
         )}
-
       </div>
     </div>
   );

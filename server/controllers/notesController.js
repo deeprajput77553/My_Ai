@@ -1,11 +1,25 @@
 import { generateResponse } from "../services/ollamaService.js";
+import { combinedSearch } from "../services/searchService.js";
+import { searchImages } from "../services/imageService.js";
 
-// ── Generate structured notes from a topic ────────────────────────────────────
+// ── Generate Notes ─────────────────────────────────────────────────────────────
 export const generateNotes = async (req, res) => {
   try {
     const { prompt } = req.body;
 
+    // Fetch web context + images in parallel
+    const [searchResults, images] = await Promise.all([
+      combinedSearch(prompt),
+      searchImages(prompt, 6),
+    ]);
+
+    const webContext = searchResults.length
+      ? `\n\nAdditional web context:\n` +
+        searchResults.map((r) => `- ${r.title}: ${r.snippet}`).join("\n")
+      : "";
+
     const notesPrompt = `You are an expert note-taking assistant. Generate comprehensive, well-structured notes on the following topic.
+${webContext}
 
 STRICT RULES:
 - Always respond in clean Markdown format
@@ -22,14 +36,15 @@ STRICT RULES:
 Topic: ${prompt}`;
 
     const notes = await generateResponse(notesPrompt);
-    res.json({ notes });
+
+    res.json({ notes, searchResults, images });
   } catch (err) {
     console.error("generateNotes error:", err);
     res.status(500).json({ error: err.message });
   }
 };
 
-// ── Parse raw file text into a list of questions/topics ───────────────────────
+// ── Parse Questions from File ──────────────────────────────────────────────────
 export const parseQuestions = async (req, res) => {
   try {
     const { text } = req.body;
@@ -49,15 +64,12 @@ ${text.slice(0, 4000)}`;
 
     const raw = await generateResponse(parsePrompt);
 
-    // Parse the JSON array from AI response
     let questions = [];
     try {
-      // Strip any accidental markdown fences
       const cleaned = raw.replace(/```json|```/g, "").trim();
       questions = JSON.parse(cleaned);
       if (!Array.isArray(questions)) questions = [];
     } catch {
-      // Fallback: try to extract lines that look like questions
       questions = raw
         .split("\n")
         .map((l) => l.replace(/^[\d\-\.\*\[\]]+\s*/, "").trim())
@@ -71,13 +83,24 @@ ${text.slice(0, 4000)}`;
   }
 };
 
-// ── Answer a single question with full detail ─────────────────────────────────
+// ── Answer Single Question ─────────────────────────────────────────────────────
 export const answerQuestion = async (req, res) => {
   try {
     const { question } = req.body;
 
-    const answerPrompt = `You are an expert tutor. Answer the following question thoroughly and in detail.
+    // Fetch relevant web context for this specific question
+    const [searchResults, images] = await Promise.all([
+      combinedSearch(question),
+      searchImages(question, 4),
+    ]);
 
+    const webContext = searchResults.length
+      ? `\nWeb context:\n` +
+        searchResults.map((r) => `- ${r.title}: ${r.snippet}`).join("\n") + "\n"
+      : "";
+
+    const answerPrompt = `You are an expert tutor. Answer the following question thoroughly and in detail.
+${webContext}
 RULES:
 - Respond in clean Markdown
 - Use ## for section headings within your answer
@@ -89,7 +112,8 @@ RULES:
 Question: ${question}`;
 
     const answer = await generateResponse(answerPrompt);
-    res.json({ answer });
+
+    res.json({ answer, searchResults, images });
   } catch (err) {
     console.error("answerQuestion error:", err);
     res.status(500).json({ error: err.message });
