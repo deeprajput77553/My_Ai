@@ -5,11 +5,12 @@ import { generateNotes, parseQuestionsFromFile, answerQuestion } from "../api";
 import { extractTextFromFile } from "../utils/fileExtractor";
 import { exportToPdf } from "../utils/exportPdf";
 import { exportToDocx } from "../utils/exportDocx";
+import SourcesPanel from "./SourcesPanel";
 import "./Notes.css";
 
-// ── Custom table renderer for polished styling ────────────────────────────────
+// ── Custom table renderer ─────────────────────────────────────────────────────
 const MarkdownComponents = {
-  table: ({ children }) => (
+  table:  ({ children }) => (
     <div style={{ overflowX: "auto", margin: "18px 0" }}>
       <table>{children}</table>
     </div>
@@ -21,7 +22,6 @@ const MarkdownComponents = {
   td:    ({ children }) => <td>{children}</td>,
 };
 
-// ── Rendered markdown with custom table ──────────────────────────────────────
 function MdBody({ content, refProp }) {
   return (
     <div className="markdownBody" ref={refProp}>
@@ -32,47 +32,47 @@ function MdBody({ content, refProp }) {
   );
 }
 
-function Notes({ onNotesSaved }) {
-  const [prompt, setPrompt]         = useState("");
-  const [notes, setNotes]           = useState("");
-  const [loading, setLoading]       = useState(false);
+function Notes({ onNotesSaved, preloadedNote }) {
+  const [prompt, setPrompt]       = useState("");
+  const [notes, setNotes]         = useState(preloadedNote?.notes || "");
+  const [loading, setLoading]     = useState(false);
+  const [searchResults, setSearchResults] = useState([]);
+  const [images, setImages]       = useState([]);
+  const [searchQuery, setSearchQuery] = useState("");
 
   // File / Q&A state
-  const [file, setFile]             = useState(null);
-  const [questions, setQuestions]   = useState([]);   // parsed question strings
-  const [answers, setAnswers]       = useState({});   // { [index]: markdown string }
-  const [activeQ, setActiveQ]       = useState(null); // index
-  const [qaLoading, setQaLoading]   = useState(false);
-  const [mode, setMode]             = useState("notes"); // "notes" | "qa"
+  const [file, setFile]           = useState(null);
+  const [questions, setQuestions] = useState([]);
+  const [answers, setAnswers]     = useState({});      // { index: { answer, searchResults, images } }
+  const [activeQ, setActiveQ]     = useState(null);
+  const [qaLoading, setQaLoading] = useState(false);
+  const [mode, setMode]           = useState("notes");
 
   const fileInputRef = useRef(null);
   const notesRef     = useRef(null);
 
-  // ── File picked ─────────────────────────────────────────────────────────────
-  const handleFileChange = async (e) => {
+  const handleFileChange = (e) => {
     const picked = e.target.files[0];
     if (!picked) return;
     setFile(picked);
-    e.target.value = ""; // reset so same file can be re-picked
+    e.target.value = "";
   };
 
   const removeFile = () => { setFile(null); setQuestions([]); setMode("notes"); };
 
-  // ── Generate notes (text prompt) ────────────────────────────────────────────
   const handleGenerate = async () => {
     if (!prompt.trim() && !file) return;
     setLoading(true);
     setNotes("");
+    setSearchResults([]);
+    setImages([]);
     setMode("notes");
 
     try {
       if (file) {
-        // 1. Extract text from file
         const rawText = await extractTextFromFile(file);
-
-        // 2. Ask AI to parse into questions/topics list
         const parseRes = await parseQuestionsFromFile(rawText);
-        const parsed = parseRes.data.questions; // string[]
+        const parsed = parseRes.data.questions;
 
         if (parsed.length > 0) {
           setQuestions(parsed);
@@ -80,34 +80,40 @@ function Notes({ onNotesSaved }) {
           setActiveQ(0);
           setMode("qa");
         } else {
-          // Fallback: treat file as regular notes prompt
           const res = await generateNotes(rawText.slice(0, 1500));
           setNotes(res.data.notes);
-          saveToHistory(file.name, res.data.notes);
+          setSearchResults(res.data.searchResults || []);
+          setImages(res.data.images || []);
+          setSearchQuery(file.name);
+          if (onNotesSaved) onNotesSaved(file.name, res.data.notes);
         }
       } else {
         const res = await generateNotes(prompt);
         setNotes(res.data.notes);
-        saveToHistory(prompt, res.data.notes);
+        setSearchResults(res.data.searchResults || []);
+        setImages(res.data.images || []);
+        setSearchQuery(prompt);
+        if (onNotesSaved) onNotesSaved(prompt, res.data.notes);
       }
     } catch (err) {
       console.error("Generation failed:", err);
     }
-
     setLoading(false);
   };
 
-  const saveToHistory = (p, n) => {
-    if (onNotesSaved) onNotesSaved(p, n);
-  };
-
-  // ── Answer a single question ─────────────────────────────────────────────────
   const handleAnswerQuestion = async (index) => {
-    if (answers[index]) return; // already answered, just switch tab
+    if (answers[index]) return;
     setQaLoading(true);
     try {
       const res = await answerQuestion(questions[index]);
-      setAnswers((prev) => ({ ...prev, [index]: res.data.answer }));
+      setAnswers((prev) => ({
+        ...prev,
+        [index]: {
+          answer: res.data.answer,
+          searchResults: res.data.searchResults || [],
+          images: res.data.images || [],
+        },
+      }));
     } catch (err) {
       console.error("Answer failed:", err);
     }
@@ -123,17 +129,13 @@ function Notes({ onNotesSaved }) {
     if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); handleGenerate(); }
   };
 
-  const filename = (prompt || file?.name || "notes")
-    .slice(0, 30).replace(/\s+/g, "_");
+  const filename = (prompt || file?.name || "notes").slice(0, 30).replace(/\s+/g, "_");
 
-  // ── Render ───────────────────────────────────────────────────────────────────
   return (
     <div className="notesPage">
 
       {/* Input row */}
       <div className="notesInputArea">
-
-        {/* Hidden file input */}
         <input
           ref={fileInputRef}
           type="file"
@@ -142,14 +144,12 @@ function Notes({ onNotesSaved }) {
           onChange={handleFileChange}
         />
 
-        {/* + button */}
         <button
           className="fileUploadBtn"
           onClick={() => fileInputRef.current.click()}
           title="Upload file (PDF, DOCX, TXT, JSON)"
         >+</button>
 
-        {/* File badge OR text input */}
         {file ? (
           <div className="fileBadge">
             <span>📎</span>
@@ -178,8 +178,6 @@ function Notes({ onNotesSaved }) {
       {/* ── Q&A Mode ── */}
       {mode === "qa" && questions.length > 0 && (
         <div className="qaSection">
-
-          {/* Question pills nav */}
           <div className="qaNav">
             {questions.map((q, i) => (
               <button
@@ -192,25 +190,17 @@ function Notes({ onNotesSaved }) {
             ))}
           </div>
 
-          {/* Active question + answer */}
           <div className="qaContent">
             {activeQ !== null && (
               <>
-                <div className="qaQuestion">
-                  {questions[activeQ]}
-                </div>
+                <div className="qaQuestion">{questions[activeQ]}</div>
 
-                {/* Not yet answered */}
                 {!answers[activeQ] && !qaLoading && (
-                  <button
-                    className="qaGenerateBtn"
-                    onClick={() => handleAnswerQuestion(activeQ)}
-                  >
+                  <button className="qaGenerateBtn" onClick={() => handleAnswerQuestion(activeQ)}>
                     ✦ Generate Answer
                   </button>
                 )}
 
-                {/* Loading */}
                 {qaLoading && !answers[activeQ] && (
                   <div className="notesLoading">
                     <div className="dots"><span/><span/><span/></div>
@@ -218,24 +208,31 @@ function Notes({ onNotesSaved }) {
                   </div>
                 )}
 
-                {/* Answer */}
                 {answers[activeQ] && (
-                  <div className="notesCard" style={{ marginTop: "16px" }}>
-                    <div className="downloadBar">
-                      <span className="downloadLabel">Answer — Q{activeQ + 1}</span>
-                      <div className="downloadBtns">
-                        <button className="downloadBtn"
-                          onClick={() => exportToPdf(notesRef, `Q${activeQ + 1}_answer`)}>
-                          ⬇ PDF
-                        </button>
-                        <button className="downloadBtn docx"
-                          onClick={() => exportToDocx(answers[activeQ], `Q${activeQ + 1}_answer`)}>
-                          ⬇ DOCX
-                        </button>
+                  <>
+                    <div className="notesCard" style={{ marginTop: "16px" }}>
+                      <div className="downloadBar">
+                        <span className="downloadLabel">Answer — Q{activeQ + 1}</span>
+                        <div className="downloadBtns">
+                          <button className="downloadBtn"
+                            onClick={() => exportToPdf(notesRef, `Q${activeQ + 1}_answer`)}>
+                            ⬇ PDF
+                          </button>
+                          <button className="downloadBtn docx"
+                            onClick={() => exportToDocx(answers[activeQ].answer, `Q${activeQ + 1}_answer`)}>
+                            ⬇ DOCX
+                          </button>
+                        </div>
                       </div>
+                      <MdBody content={answers[activeQ].answer} refProp={notesRef} />
                     </div>
-                    <MdBody content={answers[activeQ]} refProp={notesRef} />
-                  </div>
+
+                    <SourcesPanel
+                      searchResults={answers[activeQ].searchResults}
+                      images={answers[activeQ].images}
+                      searchQuery={questions[activeQ]}
+                    />
+                  </>
                 )}
               </>
             )}
@@ -246,7 +243,6 @@ function Notes({ onNotesSaved }) {
       {/* ── Notes Mode ── */}
       {mode === "notes" && (
         <div className="notesContent">
-
           {!notes && !loading && (
             <div className="notesEmpty">
               <div className="notesEmptyIcon">📝</div>
@@ -265,22 +261,30 @@ function Notes({ onNotesSaved }) {
           )}
 
           {notes && !loading && (
-            <div className="notesCard">
-              <div className="downloadBar">
-                <span className="downloadLabel">📄 Generated Notes</span>
-                <div className="downloadBtns">
-                  <button className="downloadBtn"
-                    onClick={() => exportToPdf(notesRef, filename)}>
-                    ⬇ PDF
-                  </button>
-                  <button className="downloadBtn docx"
-                    onClick={() => exportToDocx(notes, filename)}>
-                    ⬇ DOCX
-                  </button>
+            <>
+              <div className="notesCard">
+                <div className="downloadBar">
+                  <span className="downloadLabel">📄 Generated Notes</span>
+                  <div className="downloadBtns">
+                    <button className="downloadBtn"
+                      onClick={() => exportToPdf(notesRef, filename)}>
+                      ⬇ PDF
+                    </button>
+                    <button className="downloadBtn docx"
+                      onClick={() => exportToDocx(notes, filename)}>
+                      ⬇ DOCX
+                    </button>
+                  </div>
                 </div>
+                <MdBody content={notes} refProp={notesRef} />
               </div>
-              <MdBody content={notes} refProp={notesRef} />
-            </div>
+
+              <SourcesPanel
+                searchResults={searchResults}
+                images={images}
+                searchQuery={searchQuery}
+              />
+            </>
           )}
         </div>
       )}

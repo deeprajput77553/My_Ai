@@ -2,6 +2,7 @@ import { useEffect, useState, useRef, useCallback } from "react";
 import { sendMessage, getChats } from "./api";
 import Sidebar from "./components/Sidebar";
 import Notes from "./components/Notes";
+import SourcesPanel from "./components/SourcesPanel";
 import "./App.css";
 
 // ── Typing animation ──────────────────────────────────────────────────────────
@@ -34,24 +35,25 @@ function TypingMessage({ text, onDone }) {
 
 // ── App ───────────────────────────────────────────────────────────────────────
 function App() {
-  const [tab, setTab]                   = useState("chat");
-  const [message, setMessage]           = useState("");
-  const [chats, setChats]               = useState([]);
-  const [activeChatIndex, setActiveChatIndex] = useState(null);
-  const [displayedChats, setDisplayedChats]   = useState([]);
-  const [loading, setLoading]           = useState(false);
-  const [sidebarOpen, setSidebarOpen]   = useState(false);
-  const [typingId, setTypingId]         = useState(null);
+  const [tab, setTab]                             = useState("chat");
+  const [message, setMessage]                     = useState("");
+  const [chats, setChats]                         = useState([]);
+  const [activeChatIndex, setActiveChatIndex]     = useState(null);
+  const [displayedChats, setDisplayedChats]       = useState([]);
 
-  // Notes history: [{ prompt, notes, timestamp }]
-  const [notesHistory, setNotesHistory]         = useState([]);
-  const [activeNotesIndex, setActiveNotesIndex] = useState(null);
-  const [loadedNote, setLoadedNote]             = useState(null); // notes loaded from history
+  // Per-message search data: { [chatId]: { searchResults, images, searchQuery } }
+  const [chatMeta, setChatMeta]                   = useState({});
 
-  const bottomRef = useRef(null);
+  const [loading, setLoading]                     = useState(false);
+  const [sidebarOpen, setSidebarOpen]             = useState(false);
+  const [typingId, setTypingId]                   = useState(null);
+  const [notesHistory, setNotesHistory]           = useState([]);
+  const [activeNotesIndex, setActiveNotesIndex]   = useState(null);
+  const [loadedNote, setLoadedNote]               = useState(null);
+
+  const bottomRef        = useRef(null);
   const handleTypingDone = useCallback(() => setTypingId(null), []);
 
-  // Load chats on mount
   useEffect(() => {
     const load = async () => {
       const res = await getChats();
@@ -87,11 +89,20 @@ function App() {
     setMessage("");
     try {
       const res = await sendMessage(userText);
-      const newChat = res.data;
-      setChats((prev) => [...prev, newChat]);
+      const { searchResults, images, searchQuery, webEnhanced, ...chat } = res.data;
+
+      setChats((prev) => [...prev, chat]);
       setActiveChatIndex(null);
-      setDisplayedChats((prev) => [...prev, newChat]);
-      setTypingId(newChat._id);
+      setDisplayedChats((prev) => [...prev, chat]);
+      setTypingId(chat._id);
+
+      // Store search meta keyed by chat _id
+      if (webEnhanced && chat._id) {
+        setChatMeta((prev) => ({
+          ...prev,
+          [chat._id]: { searchResults, images, searchQuery },
+        }));
+      }
     } catch (err) {
       console.error(err);
     }
@@ -102,7 +113,7 @@ function App() {
     if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); handleSend(); }
   };
 
-  // ── Notes history handlers ────────────────────────────────────────────────
+  // ── Notes history ─────────────────────────────────────────────────────────
   const handleNotesSaved = (prompt, notes) => {
     const entry = {
       prompt,
@@ -140,7 +151,7 @@ function App() {
 
       <div className="main">
 
-        {/* ── Sticky Topbar ── */}
+        {/* ── Sticky topbar ── */}
         <div className="topbar">
           <button className="menuBtn" onClick={() => setSidebarOpen(true)}>☰</button>
           <h2>OLLAMA AI</h2>
@@ -156,7 +167,7 @@ function App() {
           </div>
         </div>
 
-        {/* ── Chat Tab ── */}
+        {/* ── Chat tab ── */}
         {tab === "chat" && (
           <>
             <div className="chatBox">
@@ -167,22 +178,36 @@ function App() {
                 </div>
               )}
 
-              {displayedChats.map((chat, i) => (
-                <div key={chat._id || i} className="messageBlock">
-                  <div className="userRow">
-                    <div className="userMsg">{chat.userMessage}</div>
-                  </div>
-                  <div className="aiRow">
-                    <div className="aiMsg">
-                      {chat._id === typingId ? (
-                        <TypingMessage text={chat.aiMessage} onDone={handleTypingDone} />
-                      ) : (
-                        chat.aiMessage
-                      )}
+              {displayedChats.map((chat, i) => {
+                const meta = chatMeta[chat._id];
+                return (
+                  <div key={chat._id || i} className="messageBlock">
+                    <div className="userRow">
+                      <div className="userMsg">{chat.userMessage}</div>
                     </div>
+                    <div className="aiRow">
+                      <div className="aiMsg">
+                        {chat._id === typingId ? (
+                          <TypingMessage text={chat.aiMessage} onDone={handleTypingDone} />
+                        ) : (
+                          chat.aiMessage
+                        )}
+                      </div>
+                    </div>
+
+                    {/* Sources panel — only if web search was used */}
+                    {meta && (
+                      <div className="aiRow" style={{ maxWidth: "70%" }}>
+                        <SourcesPanel
+                          searchResults={meta.searchResults}
+                          images={meta.images}
+                          searchQuery={meta.searchQuery}
+                        />
+                      </div>
+                    )}
                   </div>
-                </div>
-              ))}
+                );
+              })}
 
               {loading && (
                 <div className="aiRow">
@@ -209,7 +234,7 @@ function App() {
           </>
         )}
 
-        {/* ── Notes Tab ── */}
+        {/* ── Notes tab ── */}
         {tab === "notes" && (
           <Notes
             onNotesSaved={handleNotesSaved}
