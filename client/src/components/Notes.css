@@ -1,0 +1,321 @@
+/* ===== NOTES PAGE WRAPPER ===== */
+.notesPage {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  min-height: 0;
+}
+ 
+/* ===== INPUT AREA ===== */
+.notesInputArea {
+  display: flex;
+  gap: 10px;
+  padding: 15px;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+  flex-shrink: 0;
+}
+ 
+.notesInput {
+  flex: 1;
+  padding: 12px 15px;
+  border-radius: 12px;
+  border: 1px solid rgba(255, 255, 255, 0.07);
+  background: rgba(15, 23, 42, 0.8);
+  color: white;
+  outline: none;
+  font-size: 14px;
+  transition: border-color 0.2s, box-shadow 0.2s;
+}
+ 
+.notesInput::placeholder {
+  color: #475569;
+}
+ 
+.notesInput:focus {
+  border-color: #38bdf8;
+  box-shadow: 0 0 8px rgba(56, 189, 248, 0.25);
+}
+ 
+.notesGenerateBtn {
+  padding: 10px 20px;
+  border: none;
+  border-radius: 12px;
+  background: linear-gradient(135deg, #38bdf8, #6366f1);
+  color: white;
+  cursor: pointer;
+  font-weight: 600;
+  font-size: 14px;
+  white-space: nowrap;
+  flex-shrink: 0;
+  transition: opacity 0.2s, transform 0.15s;
+}
+ 
+.notesGenerateBtn:hover:not(:disabled) {
+  transform: scale(1.04);
+  opacity: 0.92;
+}
+ 
+.notesGenerateBtn:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+  transform: none;
+}
+ 
+/* ===== NOTES CONTENT AREA ===== */
+.notesContent {
+  flex: 1;
+  overflow-y: auto;
+  padding: 30px 40px;
+  min-height: 0;
+}
+ 
+.notesContent::-webkit-scrollbar {
+  width: 6px;
+}
+ 
+.notesContent::-webkit-scrollbar-thumb {
+  background: rgba(255, 255, 255, 0.1);
+  border-radius: 10px;
+}
+ 
+.notesContent::-webkit-scrollbar-track {
+  background: transparent;
+}
+ 
+/* ===== EMPTY STATE ===== */
+.notesEmpty {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  height: 100%;
+  color: #475569;
+  font-size: 14px;
+  gap: 12px;
+  text-align: center;
+}
+ 
+.notesEmptyIcon {
+  font-size: 44px;
+  opacity: 0.4;
+}
+ 
+/* ===== NOTES CARD ===== */
+.notesCard {
+  background: rgba(15, 23, 42, 0.6);
+  border: 1px solid rgba(255, 255, 255, 0.07);
+  border-radius: 16px;
+  padding: 32px 36px;
+  backdrop-filter: blur(6px);
+}
+ 
+/* ===== DOWNLOAD BAR ===== */
+.downloadBar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 24px;
+  padding-bottom: 16px;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.07);
+  flex-wrap: wrap;
+  gap: 10px;
+}
+ 
+.downloadLabel {
+  font-size: 12px;
+  color: #64748b;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  font-weight: 600;
+}
+ 
+.downloadBtns {
+  display: flex;
+  gap: 8px;
+}
+ 
+.downloadBtn {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 7px 14px;
+  border-radius: 8px;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  background: rgba(255, 255, 255, 0.04);
+  color: #94a3b8;
+  font-size: 13px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: background 0.15s, color 0.15s, border-color 0.15s;
+}
+ 
+.downloadBtn:hover {
+  background: rgba(56, 189, 248, 0.1);
+  border-color: rgba(56, 189, 248, 0.4);
+  color: #38bdf8;
+}
+ 
+.downloadBtn.docx:hover {
+  background: rgba(99, 102, 241, 0.1);
+  border-color: rgba(99, 102, 241, 0.4);
+  color: #818cf8;
+}
+ 
+/* ===== MARKDOWN RENDERED CONTENT ===== */
+.markdownBody {
+  color: #cbd5e1;
+  font-size: 15px;
+  line-height: 1.75;
+}
+ 
+.markdownBody h1 {
+  font-size: 26px;
+  font-weight: 700;
+  color: #f1f5f9;
+  margin: 0 0 16px;
+  padding-bottom: 10px;
+  border-bottom: 2px solid rgba(56, 189, 248, 0.3);
+}
+ 
+.markdownBody h2 {
+  font-size: 20px;
+  font-weight: 600;
+  color: #e2e8f0;
+  margin: 28px 0 12px;
+  padding-left: 10px;
+  border-left: 3px solid #38bdf8;
+}
+ 
+.markdownBody h3 {
+  font-size: 16px;
+  font-weight: 600;
+  color: #cbd5e1;
+  margin: 20px 0 8px;
+}
+ 
+.markdownBody p {
+  margin: 0 0 14px;
+}
+ 
+.markdownBody strong {
+  color: #f1f5f9;
+  font-weight: 600;
+}
+ 
+.markdownBody em {
+  color: #94a3b8;
+}
+ 
+.markdownBody ul,
+.markdownBody ol {
+  padding-left: 22px;
+  margin: 0 0 14px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+ 
+.markdownBody li {
+  color: #cbd5e1;
+}
+ 
+.markdownBody ul li::marker {
+  color: #38bdf8;
+}
+ 
+.markdownBody ol li::marker {
+  color: #6366f1;
+  font-weight: 600;
+}
+ 
+.markdownBody blockquote {
+  margin: 16px 0;
+  padding: 12px 18px;
+  border-left: 3px solid #6366f1;
+  background: rgba(99, 102, 241, 0.08);
+  border-radius: 0 8px 8px 0;
+  color: #94a3b8;
+  font-style: italic;
+}
+ 
+.markdownBody code {
+  background: rgba(30, 41, 59, 0.8);
+  border: 1px solid rgba(255, 255, 255, 0.07);
+  padding: 2px 7px;
+  border-radius: 5px;
+  font-size: 13px;
+  color: #7dd3fc;
+  font-family: "Fira Code", "Cascadia Code", monospace;
+}
+ 
+.markdownBody pre {
+  background: rgba(15, 23, 42, 0.9);
+  border: 1px solid rgba(255, 255, 255, 0.07);
+  border-radius: 10px;
+  padding: 18px 20px;
+  overflow-x: auto;
+  margin: 16px 0;
+}
+ 
+.markdownBody pre code {
+  background: none;
+  border: none;
+  padding: 0;
+  font-size: 13px;
+  color: #e2e8f0;
+}
+ 
+/* ===== TABLE ===== */
+.markdownBody table {
+  width: 100%;
+  border-collapse: collapse;
+  margin: 16px 0;
+  font-size: 14px;
+  border-radius: 10px;
+  overflow: hidden;
+}
+ 
+.markdownBody thead tr {
+  background: rgba(56, 189, 248, 0.12);
+}
+ 
+.markdownBody th {
+  padding: 11px 16px;
+  text-align: left;
+  font-weight: 600;
+  color: #38bdf8;
+  border-bottom: 1px solid rgba(56, 189, 248, 0.2);
+}
+ 
+.markdownBody td {
+  padding: 10px 16px;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+  color: #cbd5e1;
+}
+ 
+.markdownBody tr:last-child td {
+  border-bottom: none;
+}
+ 
+.markdownBody tbody tr:hover {
+  background: rgba(255, 255, 255, 0.03);
+}
+ 
+.markdownBody hr {
+  border: none;
+  border-top: 1px solid rgba(255, 255, 255, 0.07);
+  margin: 24px 0;
+}
+ 
+/* ===== LOADING ===== */
+.notesLoading {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 16px;
+  padding: 60px 0;
+  color: #475569;
+  font-size: 14px;
+}
+ 

@@ -4,10 +4,16 @@ const API = axios.create({
   baseURL: "http://localhost:5000/api",
 });
 
-export const sendMessage = (message, conversationId) =>
-  API.post("/chat", { message, conversationId });
+// ── Chat ──────────────────────────────────────────
+export const sendMessage = (message) =>
+  API.post("/chat", { message });
 
-export const getChats = () => API.get("/chat");
+export const getChats = () =>
+  API.get("/chat");
 
 export const deleteChat = (id) =>
   API.delete(`/chat/${id}`);
+
+// ── Notes ─────────────────────────────────────────
+export const generateNotes = (prompt) =>
+  API.post("/notes", { prompt });
