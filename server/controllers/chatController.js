@@ -1,17 +1,11 @@
 import Chat from "../models/Chat.js";
 import { generateResponse } from "../services/ollamaService.js";
 
-const MAX_CONTEXT = 5;
-
 export const sendMessage = async (req, res) => {
   try {
     const { message } = req.body;
 
-    console.log("User message:", message);
-
-    const history = await Chat.find()
-      .sort({ createdAt: -1 })
-      .limit(5);
+    const history = await Chat.find().sort({ createdAt: -1 }).limit(5);
 
     const context = history
       .reverse()
@@ -20,11 +14,7 @@ export const sendMessage = async (req, res) => {
 
     const prompt = `${context}\nUser: ${message}\nAI:`;
 
-    console.log("Sending to Ollama...");
-
     const aiResponse = await generateResponse(prompt);
-
-    console.log("AI Response:", aiResponse);
 
     const chat = await Chat.create({
       userMessage: message,
@@ -32,14 +22,26 @@ export const sendMessage = async (req, res) => {
     });
 
     res.json(chat);
-
   } catch (err) {
-    console.error("🔥 FULL ERROR:", err); // VERY IMPORTANT
+    console.error("Error:", err);
     res.status(500).json({ error: err.message });
   }
 };
 
 export const getChats = async (req, res) => {
-  const chats = await Chat.find().sort({ createdAt: 1 });
-  res.json(chats);
+  try {
+    const chats = await Chat.find().sort({ createdAt: 1 });
+    res.json(chats);
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+};
+
+export const deleteChat = async (req, res) => {
+  try {
+    await Chat.findByIdAndDelete(req.params.id);
+    res.json({ success: true });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
 };
