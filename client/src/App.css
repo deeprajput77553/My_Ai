@@ -1,8 +1,8 @@
 /* ===== GLOBAL ===== */
 .app {
   display: flex;
-  height: 100vh;          /* FIX 1: was "max-content" — app must fill viewport for scroll to work */
-  overflow: hidden;       /* FIX 1b: prevent body-level scroll; only chatBox should scroll */
+  height: 100vh;
+  overflow: hidden;
   background: linear-gradient(135deg, #0b0f1a, #020617);
   color: #e2e8f0;
   font-family: "Segoe UI", sans-serif;
@@ -13,27 +13,34 @@
   flex: 1;
   display: flex;
   flex-direction: column;
-  height: 100vh;          /* FIX 3: must be constrained so chatBox flex-child can scroll */
+  height: 100vh;
   max-width: 900px;
   margin: 0 auto;
-  min-width: 0;           /* FIX: prevents flex overflow on narrow screens */
+  min-width: 0;
   width: 100%;
 }
 
-/* ===== TOPBAR ===== */
+/* ===== TOPBAR — STICKY ===== */
 .topbar {
   display: flex;
   align-items: center;
   gap: 12px;
-  padding: 15px;
-  border-bottom: 1px solid rgba(255, 255, 255, 0.05);
-  flex-shrink: 0;         /* FIX: don't let topbar compress when chat is full */
+  padding: 12px 16px;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.06);
+  background: rgba(11, 15, 26, 0.97);   /* ✅ solid bg so content doesn't bleed through */
+  backdrop-filter: blur(12px);
+  position: sticky;                       /* ✅ always on top */
+  top: 0;
+  z-index: 50;
+  flex-shrink: 0;
 }
 
 .topbar h2 {
-  font-size: 18px;
-  font-weight: 600;
+  font-size: 17px;
+  font-weight: 700;
   color: #38bdf8;
+  letter-spacing: 0.04em;
+  white-space: nowrap;
 }
 
 /* ===== MENU BUTTON ===== */
@@ -45,8 +52,9 @@
   cursor: pointer;
   padding: 6px 8px;
   border-radius: 8px;
-  transition: background 0.15s, color 0.15s;  /* FIX 6: was missing hover state */
+  transition: background 0.15s, color 0.15s;
   line-height: 1;
+  flex-shrink: 0;
 }
 
 .menuBtn:hover {
@@ -57,7 +65,7 @@
 /* ===== TABS ===== */
 .tabs {
   display: flex;
-  gap: 6px;
+  gap: 4px;
   margin-left: auto;
   background: rgba(255, 255, 255, 0.04);
   padding: 4px;
@@ -75,6 +83,7 @@
   font-weight: 500;
   cursor: pointer;
   transition: background 0.15s, color 0.15s;
+  white-space: nowrap;
 }
 
 .tabBtn:hover {
@@ -90,12 +99,12 @@
 /* ===== CHAT AREA ===== */
 .chatBox {
   flex: 1;
-  overflow-y: auto;       /* FIX 4: now works because .main has a constrained height */
+  overflow-y: auto;
   padding: 25px;
   display: flex;
   flex-direction: column;
   gap: 10px;
-  min-height: 0;          /* FIX 4b: required for flex children to shrink and enable scroll */
+  min-height: 0;
 }
 
 /* ===== MESSAGE BLOCK ===== */
@@ -128,14 +137,12 @@
   font-size: 14px;
 }
 
-/* USER MESSAGE */
 .userMsg {
   background: linear-gradient(135deg, #2563eb, #7c3aed);
   color: white;
   box-shadow: 0 4px 15px rgba(59, 130, 246, 0.3);
 }
 
-/* AI MESSAGE */
 .aiMsg {
   background: rgba(30, 41, 59, 0.7);
   border: 1px solid rgba(255, 255, 255, 0.07);
@@ -149,10 +156,9 @@
   gap: 10px;
   padding: 15px;
   border-top: 1px solid rgba(255, 255, 255, 0.05);
-  flex-shrink: 0;         /* FIX: keep input bar pinned at bottom */
+  flex-shrink: 0;
 }
 
-/* INPUT BOX */
 .input {
   flex: 1;
   padding: 12px 15px;
@@ -174,7 +180,6 @@
   box-shadow: 0 0 8px rgba(56, 189, 248, 0.25);
 }
 
-/* SEND BUTTON */
 .button {
   padding: 10px 20px;
   border: none;
@@ -194,25 +199,19 @@
   opacity: 0.92;
 }
 
-.button:disabled {                /* FIX 5: was missing — button looked active while loading */
+.button:disabled {
   opacity: 0.45;
   cursor: not-allowed;
   transform: none;
 }
 
 /* ===== SCROLLBAR ===== */
-.chatBox::-webkit-scrollbar {
-  width: 6px;
-}
-
+.chatBox::-webkit-scrollbar { width: 6px; }
 .chatBox::-webkit-scrollbar-thumb {
   background: rgba(255, 255, 255, 0.1);
   border-radius: 10px;
 }
-
-.chatBox::-webkit-scrollbar-track {
-  background: transparent;
-}
+.chatBox::-webkit-scrollbar-track { background: transparent; }
 
 /* ===== LOADING DOTS ===== */
 .dots {

@@ -9,7 +9,7 @@ export const sendMessage = async (req, res) => {
 
     const context = history
       .reverse()
-      .map(c => `User: ${c.userMessage}\nAI: ${c.aiMessage}`)
+      .map((c) => `User: ${c.userMessage}\nAI: ${c.aiMessage}`)
       .join("\n");
 
     const prompt = `${context}\nUser: ${message}\nAI:`;
@@ -23,7 +23,7 @@ export const sendMessage = async (req, res) => {
 
     res.json(chat);
   } catch (err) {
-    console.error("Error:", err);
+    console.error("sendMessage error:", err);
     res.status(500).json({ error: err.message });
   }
 };

@@ -1,14 +1,18 @@
-import { deleteChat } from "../api";   // ✅ one level up from components/ to src/
-import "./Sidebar.css";                 // ✅ same folder: src/components/Sidebar.css
+import { deleteChat } from "../api";
+import "./Sidebar.css";
 
-function Sidebar({ chats, setChats, onSelect, onNewChat, open, setOpen, activeIndex }) {
+function Sidebar({
+  chats, setChats, onSelectChat, onNewChat, activeChatIndex,
+  notesHistory, onSelectNotes, activeNotesIndex,
+  open, setOpen,
+}) {
 
-  const handleDelete = async (e, id, index) => {
+  const handleDeleteChat = async (e, id, index) => {
     e.stopPropagation();
     try {
       await deleteChat(id);
       setChats((prev) => prev.filter((_, i) => i !== index));
-      if (activeIndex === index) onNewChat();
+      if (activeChatIndex === index) onNewChat();
     } catch (err) {
       console.error("Delete failed:", err);
     }
@@ -20,7 +24,7 @@ function Sidebar({ chats, setChats, onSelect, onNewChat, open, setOpen, activeIn
 
         {/* Header */}
         <div className="sidebarHeader">
-          <span className="sidebarTitle">Chat History</span>
+          <span className="sidebarTitle">History</span>
           <button className="closeBtn" onClick={() => setOpen(false)}>✕</button>
         </div>
 
@@ -29,42 +33,68 @@ function Sidebar({ chats, setChats, onSelect, onNewChat, open, setOpen, activeIn
           <span>＋</span> New Chat
         </button>
 
-        {/* History List */}
-        <div className="historyList">
-          {chats.length === 0 ? (
-            <div className="emptyState">
-              <div className="emptyIcon">💬</div>
-              No chats yet. Start a conversation!
-            </div>
-          ) : (
-            chats.map((chat, i) => (
-              <div
-                key={chat._id || i}
-                className={`historyCard ${activeIndex === i ? "active" : ""}`}
-                onClick={() => { onSelect(i); setOpen(false); }}
-              >
-                <div className="historyContent">
-                  <div className="historyTitle">
-                    {chat.userMessage.length > 35
-                      ? chat.userMessage.slice(0, 35) + "…"
-                      : chat.userMessage}
+        {/* Scrollable body */}
+        <div className="sidebarBody">
+
+          {/* ── Chat History ── */}
+          <div className="sectionLabel">💬 Chats</div>
+          <div className="historyList">
+            {chats.length === 0 ? (
+              <div className="emptyState">No chats yet</div>
+            ) : (
+              chats.map((chat, i) => (
+                <div
+                  key={chat._id || i}
+                  className={`historyCard ${activeChatIndex === i ? "active" : ""}`}
+                  onClick={() => { onSelectChat(i); setOpen(false); }}
+                >
+                  <div className="historyContent">
+                    <div className="historyTitle">
+                      {chat.userMessage.length > 32
+                        ? chat.userMessage.slice(0, 32) + "…"
+                        : chat.userMessage}
+                    </div>
+                    <div className="historyPreview">
+                      {chat.aiMessage?.slice(0, 42)}…
+                    </div>
                   </div>
-                  <div className="historyPreview">
-                    {chat.aiMessage?.slice(0, 45)}…
+                  <button
+                    className="deleteBtn"
+                    onClick={(e) => handleDeleteChat(e, chat._id, i)}
+                    title="Delete"
+                  >🗑</button>
+                </div>
+              ))
+            )}
+          </div>
+
+          {/* ── Notes History ── */}
+          <hr className="sidebarDivider" />
+          <div className="sectionLabel">📝 Notes</div>
+          <div className="historyList">
+            {notesHistory.length === 0 ? (
+              <div className="emptyState">No notes yet</div>
+            ) : (
+              notesHistory.map((note, i) => (
+                <div
+                  key={i}
+                  className={`historyCard notesCard-sidebar ${activeNotesIndex === i ? "active" : ""}`}
+                  onClick={() => { onSelectNotes(i); setOpen(false); }}
+                >
+                  <div className="historyContent">
+                    <div className="historyTitle">
+                      {note.prompt.length > 32
+                        ? note.prompt.slice(0, 32) + "…"
+                        : note.prompt}
+                    </div>
+                    <div className="historyPreview">{note.timestamp}</div>
                   </div>
                 </div>
-                <button
-                  className="deleteBtn"
-                  onClick={(e) => handleDelete(e, chat._id, i)}
-                  title="Delete"
-                >
-                  🗑
-                </button>
-              </div>
-            ))
-          )}
-        </div>
+              ))
+            )}
+          </div>
 
+        </div>
       </div>
 
       {open && <div className="overlay" onClick={() => setOpen(false)} />}
