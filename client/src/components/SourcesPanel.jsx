@@ -2,23 +2,33 @@ import { useState } from "react";
 import "./SourcesPanel.css";
 
 const SOURCE_ICON = { Wikipedia: "📖", DuckDuckGo: "🔍" };
-const INITIAL_IMAGES = 3; // show 3 initially, "more" shows all 6
+const INITIAL_IMAGES = 3;
 
 function SourcesPanel({ searchResults = [], images = [], searchQuery = "" }) {
-  const [open, setOpen] = useState(false);
+  const [open, setOpen]               = useState(true);  // ✅ open by default
   const [showAllImages, setShowAllImages] = useState(false);
-  const [lightbox, setLightbox] = useState(null); // image url
+  const [lightbox, setLightbox]       = useState(null);
+  const [imgErrors, setImgErrors]     = useState({});    // track broken images
 
   if (!searchResults.length && !images.length) return null;
 
-  const visibleImages = showAllImages ? images : images.slice(0, INITIAL_IMAGES);
-  const hasMoreImages = images.length > INITIAL_IMAGES && !showAllImages;
+  // Filter out images that failed to load
+  const validImages = images.filter((_, i) => !imgErrors[i]);
+  const visibleImages = showAllImages ? validImages : validImages.slice(0, INITIAL_IMAGES);
+  const hasMoreImages = validImages.length > INITIAL_IMAGES && !showAllImages;
+
+  const handleImgError = (i) => {
+    setImgErrors((prev) => ({ ...prev, [i]: true }));
+  };
+
+  // Prefer full image URL, fall back to thumbnail
+  const getImgSrc = (img) => img.url || img.thumbnail || "";
 
   return (
     <>
       <div className="sourcesPanel">
 
-        {/* Toggle header */}
+        {/* Header — clickable to collapse/expand */}
         <div
           className={`sourcesPanelHeader ${open ? "open" : ""}`}
           onClick={() => setOpen((p) => !p)}
@@ -26,53 +36,62 @@ function SourcesPanel({ searchResults = [], images = [], searchQuery = "" }) {
           <div className="sourcesPanelTitle">
             <span>🌐</span>
             <span>Web Sources</span>
-            {searchQuery && <span className="webBadge">{searchQuery.slice(0, 24)}</span>}
+            {searchQuery && (
+              <span className="webBadge">{searchQuery.slice(0, 24)}</span>
+            )}
+            {validImages.length > 0 && (
+              <span className="webBadge" style={{ background: "rgba(99,102,241,0.12)", color: "#818cf8", borderColor: "rgba(99,102,241,0.2)" }}>
+                {validImages.length} images
+              </span>
+            )}
           </div>
           <span className={`sourcesChevron ${open ? "open" : ""}`}>▼</span>
         </div>
 
-        {/* Collapsible body */}
+        {/* Body — shown immediately, collapsible */}
         {open && (
           <div className="sourcesPanelBody">
 
-            {/* Images grid */}
-            {images.length > 0 && (
-              <>
-                <div className="imagesGrid">
-                  {visibleImages.map((img, i) => (
-                    <div
-                      key={i}
-                      className="imageThumb"
-                      onClick={() => setLightbox(img.url || img.thumbnail)}
-                    >
-                      <img
-                        src={img.thumbnail || img.url}
-                        alt={img.title || ""}
-                        loading="lazy"
-                        onError={(e) => { e.target.style.display = "none"; }}
-                      />
+            {/* ── Images grid — auto-rendered, no click needed ── */}
+            {validImages.length > 0 && (
+              <div className="imagesGrid">
+                {visibleImages.map((img, i) => (
+                  <div
+                    key={i}
+                    className="imageThumb"
+                    onClick={() => setLightbox(getImgSrc(img))}
+                    title={img.title || ""}
+                  >
+                    <img
+                      src={getImgSrc(img)}
+                      alt={img.title || "image"}
+                      loading="lazy"
+                      onError={() => handleImgError(i)}
+                    />
+                    {img.title && (
                       <div className="imageThumbTitle">{img.title}</div>
-                    </div>
-                  ))}
+                    )}
+                  </div>
+                ))}
 
-                  {hasMoreImages && (
-                    <button
-                      className="moreImagesBtn"
-                      onClick={(e) => { e.stopPropagation(); setShowAllImages(true); }}
-                    >
-                      + {images.length - INITIAL_IMAGES} more images
-                    </button>
-                  )}
-                </div>
-              </>
+                {/* More images button */}
+                {hasMoreImages && (
+                  <button
+                    className="moreImagesBtn"
+                    onClick={(e) => { e.stopPropagation(); setShowAllImages(true); }}
+                  >
+                    + {validImages.length - INITIAL_IMAGES} more images
+                  </button>
+                )}
+              </div>
             )}
 
-            {/* Divider between images and sources */}
-            {images.length > 0 && searchResults.length > 0 && (
+            {/* Divider */}
+            {validImages.length > 0 && searchResults.length > 0 && (
               <hr className="sourcesDivider" />
             )}
 
-            {/* Sources list */}
+            {/* ── Sources list ── */}
             {searchResults.length > 0 && (
               <div className="sourcesList">
                 {searchResults.map((r, i) => (
@@ -106,7 +125,12 @@ function SourcesPanel({ searchResults = [], images = [], searchQuery = "" }) {
       {lightbox && (
         <div className="lightbox" onClick={() => setLightbox(null)}>
           <button className="lightboxClose" onClick={() => setLightbox(null)}>✕</button>
-          <img src={lightbox} alt="Preview" onClick={(e) => e.stopPropagation()} />
+          <img
+            src={lightbox}
+            alt="Preview"
+            onClick={(e) => e.stopPropagation()}
+            onError={(e) => { e.target.alt = "Image failed to load"; }}
+          />
         </div>
       )}
     </>

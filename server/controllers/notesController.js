@@ -2,41 +2,44 @@ import { generateResponse } from "../services/ollamaService.js";
 import { combinedSearch } from "../services/searchService.js";
 import { searchImages } from "../services/imageService.js";
 
+const NOTES_SYSTEM = `You are a world-class educator and note-taking expert. Your notes are comprehensive, accurate, and beautifully structured.`;
+
+const ANSWER_SYSTEM = `You are an expert tutor and examiner. You give complete, exam-ready answers that cover every aspect of the question. Never cut answers short.`;
+
 // ── Generate Notes ─────────────────────────────────────────────────────────────
 export const generateNotes = async (req, res) => {
   try {
     const { prompt } = req.body;
 
-    // Fetch web context + images in parallel
     const [searchResults, images] = await Promise.all([
       combinedSearch(prompt),
       searchImages(prompt, 6),
     ]);
 
     const webContext = searchResults.length
-      ? `\n\nAdditional web context:\n` +
-        searchResults.map((r) => `- ${r.title}: ${r.snippet}`).join("\n")
+      ? `\n--- Web context ---\n` + searchResults.map((r) => `[${r.source}] ${r.title}: ${r.snippet}`).join("\n")
       : "";
 
-    const notesPrompt = `You are an expert note-taking assistant. Generate comprehensive, well-structured notes on the following topic.
+    const notesPrompt = `${NOTES_SYSTEM}
 ${webContext}
 
-STRICT RULES:
-- Always respond in clean Markdown format
-- Use # for main title, ## for sections, ### for subsections
-- Use bullet points (- ) for lists
-- Use **bold** for key terms
-- Use tables where comparisons are needed (always with a proper header row separated by |---|)
-- Use > blockquotes for important notes or tips
-- Use \`code\` for technical terms or inline code
-- Use --- to separate major sections
-- Never write plain prose without structure
-- End with a ## Summary section
+Generate thorough, well-structured notes on: "${prompt}"
 
-Topic: ${prompt}`;
+STRICT FORMAT RULES:
+- # Main title
+- ## Major sections (at least 4-6 sections)
+- ### Subsections where needed
+- **Bold** all key terms and definitions
+- Use bullet points (- ) for lists, numbered lists for steps/sequences
+- Add a comparison table (| Col | Col |) wherever two or more things can be compared
+- Use > blockquotes for important tips, warnings, or key insights
+- Use \`inline code\` for technical terms, formulas, or code
+- Use \`\`\`language blocks for multi-line code or formulas
+- Add --- between major sections
+- ## Summary at the end with 5-7 key takeaways as bullet points
+- Be exhaustive — cover history, theory, practical use, examples, and common mistakes`;
 
     const notes = await generateResponse(notesPrompt);
-
     res.json({ notes, searchResults, images });
   } catch (err) {
     console.error("generateNotes error:", err);
@@ -49,15 +52,9 @@ export const parseQuestions = async (req, res) => {
   try {
     const { text } = req.body;
 
-    const parsePrompt = `You are a question extraction assistant. Read the following text and extract all questions or topics that need to be answered or explained.
-
-RULES:
-- Return ONLY a JSON array of strings, nothing else
-- Each string is one question or topic
-- If the text contains numbered questions, extract each one
-- If the text contains topics/assignments, treat each as a question
-- Do not include any explanation, preamble, or markdown — ONLY the raw JSON array
-- Example output: ["What is photosynthesis?", "Explain the water cycle", "Define osmosis"]
+    const parsePrompt = `Extract every question or topic from the text below.
+Return ONLY a raw JSON array of strings. No explanation, no markdown, no preamble.
+Example: ["What is X?", "Explain Y", "Define Z"]
 
 Text:
 ${text.slice(0, 4000)}`;
@@ -67,12 +64,12 @@ ${text.slice(0, 4000)}`;
     let questions = [];
     try {
       const cleaned = raw.replace(/```json|```/g, "").trim();
-      questions = JSON.parse(cleaned);
-      if (!Array.isArray(questions)) questions = [];
+      const parsed = JSON.parse(cleaned);
+      questions = Array.isArray(parsed) ? parsed : [];
     } catch {
       questions = raw
         .split("\n")
-        .map((l) => l.replace(/^[\d\-\.\*\[\]]+\s*/, "").trim())
+        .map((l) => l.replace(/^[\d\-\.\*\[\]"]+\s*/, "").replace(/[",$]+$/, "").trim())
         .filter((l) => l.length > 5);
     }
 
@@ -88,31 +85,31 @@ export const answerQuestion = async (req, res) => {
   try {
     const { question } = req.body;
 
-    // Fetch relevant web context for this specific question
     const [searchResults, images] = await Promise.all([
       combinedSearch(question),
       searchImages(question, 4),
     ]);
 
     const webContext = searchResults.length
-      ? `\nWeb context:\n` +
-        searchResults.map((r) => `- ${r.title}: ${r.snippet}`).join("\n") + "\n"
+      ? `\n--- Web context ---\n` + searchResults.map((r) => `[${r.source}] ${r.title}: ${r.snippet}`).join("\n") + "\n"
       : "";
 
-    const answerPrompt = `You are an expert tutor. Answer the following question thoroughly and in detail.
+    const answerPrompt = `${ANSWER_SYSTEM}
 ${webContext}
-RULES:
-- Respond in clean Markdown
-- Use ## for section headings within your answer
-- Use bullet points, numbered lists, tables, and code blocks where appropriate
-- Use **bold** for key terms
-- Be comprehensive — do not truncate or summarize prematurely
-- End with a brief ## Key Takeaways section
 
-Question: ${question}`;
+Answer this question completely and in full detail: "${question}"
+
+FORMAT RULES:
+- Use ## headings to organize your answer into clear sections
+- Use **bold** for key terms and definitions
+- Use bullet points and numbered lists for clarity
+- Include a comparison table if the question involves comparing things
+- Include worked examples where relevant
+- Use \`code blocks\` for any code, formulas, or commands
+- Do NOT cut the answer short — cover every aspect
+- End with ## Key Takeaways (5 bullet points summarizing the most important points)`;
 
     const answer = await generateResponse(answerPrompt);
-
     res.json({ answer, searchResults, images });
   } catch (err) {
     console.error("answerQuestion error:", err);

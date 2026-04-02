@@ -6,20 +6,27 @@ import { extractTextFromFile } from "../utils/fileExtractor";
 import { exportToPdf } from "../utils/exportPdf";
 import { exportToDocx } from "../utils/exportDocx";
 import SourcesPanel from "./SourcesPanel";
+import CodeBlock from "./CodeBlock";
 import "./Notes.css";
 
-// ── Custom table renderer ─────────────────────────────────────────────────────
+// ── Markdown with CodeBlock + left-aligned text ───────────────────────────────
 const MarkdownComponents = {
-  table:  ({ children }) => (
-    <div style={{ overflowX: "auto", margin: "18px 0" }}>
-      <table>{children}</table>
-    </div>
-  ),
-  thead: ({ children }) => <thead>{children}</thead>,
-  tbody: ({ children }) => <tbody>{children}</tbody>,
-  tr:    ({ children }) => <tr>{children}</tr>,
-  th:    ({ children }) => <th>{children}</th>,
-  td:    ({ children }) => <td>{children}</td>,
+  code({ node, inline, className, children }) {
+    if (inline) return (
+      <code style={{
+        background: "rgba(30,41,59,0.9)", border: "1px solid rgba(255,255,255,0.08)",
+        padding: "2px 6px", borderRadius: "4px", fontSize: "13px",
+        color: "#7dd3fc", fontFamily: "Fira Code, Consolas, monospace",
+      }}>{children}</code>
+    );
+    return <CodeBlock className={className}>{children}</CodeBlock>;
+  },
+  table:  ({ children }) => <div style={{ overflowX: "auto", margin: "18px 0" }}><table>{children}</table></div>,
+  thead:  ({ children }) => <thead>{children}</thead>,
+  tbody:  ({ children }) => <tbody>{children}</tbody>,
+  tr:     ({ children }) => <tr>{children}</tr>,
+  th:     ({ children }) => <th>{children}</th>,
+  td:     ({ children }) => <td>{children}</td>,
 };
 
 function MdBody({ content, refProp }) {
@@ -32,21 +39,30 @@ function MdBody({ content, refProp }) {
   );
 }
 
-function Notes({ onNotesSaved, preloadedNote }) {
-  const [prompt, setPrompt]       = useState("");
-  const [notes, setNotes]         = useState(preloadedNote?.notes || "");
-  const [loading, setLoading]     = useState(false);
-  const [searchResults, setSearchResults] = useState([]);
-  const [images, setImages]       = useState([]);
-  const [searchQuery, setSearchQuery] = useState("");
+// Detect if content is purely a code response
+const isCodeOnly = (text = "") => {
+  const trimmed = text.trim();
+  return trimmed.startsWith("```") && trimmed.split("```").length >= 3;
+};
 
-  // File / Q&A state
-  const [file, setFile]           = useState(null);
-  const [questions, setQuestions] = useState([]);
-  const [answers, setAnswers]     = useState({});      // { index: { answer, searchResults, images } }
-  const [activeQ, setActiveQ]     = useState(null);
-  const [qaLoading, setQaLoading] = useState(false);
-  const [mode, setMode]           = useState("notes");
+function Notes({ onNotesSaved, preloadedNote }) {
+  const [prompt, setPrompt]             = useState("");
+  const [notes, setNotes]               = useState(preloadedNote?.notes || "");
+  const [loading, setLoading]           = useState(false);
+  const [searchResults, setSearchResults] = useState([]);
+  const [images, setImages]             = useState([]);
+  const [searchQuery, setSearchQuery]   = useState("");
+
+  // File state
+  const [file, setFile]                 = useState(null);
+  const [filePrompt, setFilePrompt]     = useState(""); // extra prompt for file ✅
+
+  // Q&A state
+  const [questions, setQuestions]       = useState([]);
+  const [answers, setAnswers]           = useState({});
+  const [activeQ, setActiveQ]           = useState(null);
+  const [qaLoading, setQaLoading]       = useState(false);
+  const [mode, setMode]                 = useState("notes");
 
   const fileInputRef = useRef(null);
   const notesRef     = useRef(null);
@@ -58,7 +74,12 @@ function Notes({ onNotesSaved, preloadedNote }) {
     e.target.value = "";
   };
 
-  const removeFile = () => { setFile(null); setQuestions([]); setMode("notes"); };
+  const removeFile = () => {
+    setFile(null);
+    setFilePrompt("");
+    setQuestions([]);
+    setMode("notes");
+  };
 
   const handleGenerate = async () => {
     if (!prompt.trim() && !file) return;
@@ -71,8 +92,14 @@ function Notes({ onNotesSaved, preloadedNote }) {
     try {
       if (file) {
         const rawText = await extractTextFromFile(file);
-        const parseRes = await parseQuestionsFromFile(rawText);
-        const parsed = parseRes.data.questions;
+
+        // Append extra user prompt to the extracted text if provided
+        const combined = filePrompt.trim()
+          ? `${rawText}\n\nAdditional instruction: ${filePrompt}`
+          : rawText;
+
+        const parseRes = await parseQuestionsFromFile(combined);
+        const parsed   = parseRes.data.questions;
 
         if (parsed.length > 0) {
           setQuestions(parsed);
@@ -80,7 +107,8 @@ function Notes({ onNotesSaved, preloadedNote }) {
           setActiveQ(0);
           setMode("qa");
         } else {
-          const res = await generateNotes(rawText.slice(0, 1500));
+          // Fallback: treat as notes prompt
+          const res = await generateNotes(combined.slice(0, 1500));
           setNotes(res.data.notes);
           setSearchResults(res.data.searchResults || []);
           setImages(res.data.images || []);
@@ -109,14 +137,12 @@ function Notes({ onNotesSaved, preloadedNote }) {
       setAnswers((prev) => ({
         ...prev,
         [index]: {
-          answer: res.data.answer,
+          answer:        res.data.answer,
           searchResults: res.data.searchResults || [],
-          images: res.data.images || [],
+          images:        res.data.images        || [],
         },
       }));
-    } catch (err) {
-      console.error("Answer failed:", err);
-    }
+    } catch (err) { console.error("Answer failed:", err); }
     setQaLoading(false);
   };
 
@@ -134,7 +160,7 @@ function Notes({ onNotesSaved, preloadedNote }) {
   return (
     <div className="notesPage">
 
-      {/* Input row */}
+      {/* ── Input row ── */}
       <div className="notesInputArea">
         <input
           ref={fileInputRef}
@@ -144,17 +170,29 @@ function Notes({ onNotesSaved, preloadedNote }) {
           onChange={handleFileChange}
         />
 
+        {/* + upload button */}
         <button
           className="fileUploadBtn"
           onClick={() => fileInputRef.current.click()}
           title="Upload file (PDF, DOCX, TXT, JSON)"
         >+</button>
 
+        {/* File badge OR text prompt */}
         {file ? (
-          <div className="fileBadge">
-            <span>📎</span>
-            <span className="fileBadgeName">{file.name}</span>
-            <button className="fileBadgeRemove" onClick={removeFile}>✕</button>
+          <div style={{ display: "flex", flex: 1, gap: "8px", alignItems: "center", minWidth: 0 }}>
+            <div className="fileBadge" style={{ flexShrink: 0 }}>
+              <span>📎</span>
+              <span className="fileBadgeName">{file.name}</span>
+              <button className="fileBadgeRemove" onClick={removeFile}>✕</button>
+            </div>
+            {/* Extra prompt for file ✅ */}
+            <input
+              className="notesInput"
+              value={filePrompt}
+              onChange={(e) => setFilePrompt(e.target.value)}
+              onKeyDown={handleKeyDown}
+              placeholder="Optional: add instructions for this file…"
+            />
           </div>
         ) : (
           <input
@@ -184,9 +222,7 @@ function Notes({ onNotesSaved, preloadedNote }) {
                 key={i}
                 className={`qaPill ${activeQ === i ? "activeQa" : ""} ${answers[i] ? "answered" : ""}`}
                 onClick={() => handleQaPillClick(i)}
-              >
-                Q{i + 1}
-              </button>
+              >Q{i + 1}</button>
             ))}
           </div>
 
@@ -214,19 +250,19 @@ function Notes({ onNotesSaved, preloadedNote }) {
                       <div className="downloadBar">
                         <span className="downloadLabel">Answer — Q{activeQ + 1}</span>
                         <div className="downloadBtns">
-                          <button className="downloadBtn"
-                            onClick={() => exportToPdf(notesRef, `Q${activeQ + 1}_answer`)}>
-                            ⬇ PDF
-                          </button>
-                          <button className="downloadBtn docx"
-                            onClick={() => exportToDocx(answers[activeQ].answer, `Q${activeQ + 1}_answer`)}>
-                            ⬇ DOCX
-                          </button>
+                          <button className="downloadBtn" onClick={() => exportToPdf(notesRef, `Q${activeQ + 1}_answer`)}>⬇ PDF</button>
+                          <button className="downloadBtn docx" onClick={() => exportToDocx(answers[activeQ].answer, `Q${activeQ + 1}_answer`)}>⬇ DOCX</button>
                         </div>
                       </div>
-                      <MdBody content={answers[activeQ].answer} refProp={notesRef} />
+                      {/* Code-only: skip explanation wrapper ✅ */}
+                      {isCodeOnly(answers[activeQ].answer) ? (
+                        <div ref={notesRef}>
+                          <MdBody content={answers[activeQ].answer} />
+                        </div>
+                      ) : (
+                        <MdBody content={answers[activeQ].answer} refProp={notesRef} />
+                      )}
                     </div>
-
                     <SourcesPanel
                       searchResults={answers[activeQ].searchResults}
                       images={answers[activeQ].images}
@@ -262,28 +298,25 @@ function Notes({ onNotesSaved, preloadedNote }) {
 
           {notes && !loading && (
             <>
-              <div className="notesCard">
-                <div className="downloadBar">
-                  <span className="downloadLabel">📄 Generated Notes</span>
-                  <div className="downloadBtns">
-                    <button className="downloadBtn"
-                      onClick={() => exportToPdf(notesRef, filename)}>
-                      ⬇ PDF
-                    </button>
-                    <button className="downloadBtn docx"
-                      onClick={() => exportToDocx(notes, filename)}>
-                      ⬇ DOCX
-                    </button>
-                  </div>
+              {/* Code-only: no card wrapper, just the block ✅ */}
+              {isCodeOnly(notes) ? (
+                <div ref={notesRef}>
+                  <MdBody content={notes} />
                 </div>
-                <MdBody content={notes} refProp={notesRef} />
-              </div>
+              ) : (
+                <div className="notesCard">
+                  <div className="downloadBar">
+                    <span className="downloadLabel">📄 Generated Notes</span>
+                    <div className="downloadBtns">
+                      <button className="downloadBtn" onClick={() => exportToPdf(notesRef, filename)}>⬇ PDF</button>
+                      <button className="downloadBtn docx" onClick={() => exportToDocx(notes, filename)}>⬇ DOCX</button>
+                    </div>
+                  </div>
+                  <MdBody content={notes} refProp={notesRef} />
+                </div>
+              )}
 
-              <SourcesPanel
-                searchResults={searchResults}
-                images={images}
-                searchQuery={searchQuery}
-              />
+              <SourcesPanel searchResults={searchResults} images={images} searchQuery={searchQuery} />
             </>
           )}
         </div>
