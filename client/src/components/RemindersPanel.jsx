@@ -400,7 +400,7 @@ function RemindersPanel() {
                         {isExpanded ? "▲" : "▼"}
                       </button>
                     )}
-                    <button className="rp-del-btn" onClick={() => handleDelete(r._id)}>×</button>
+                    <button className="rp-del-btn" onClick={() => handleDelete(r._id)}><i className="fi fi-sr-trash"></i></button>
                   </div>
                 </div>
 

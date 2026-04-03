@@ -218,7 +218,7 @@ function AdminPanel() {
                           <button className="adm-approve-btn" onClick={() => handleStatusChange(u._id, "active")} title="Unblock">✓</button>
                         )}
                         {!isMe && (
-                          <button className="adm-delete-btn" onClick={() => handleDelete(u._id, u.email)} title="Delete">🗑</button>
+                          <button className="adm-delete-btn" onClick={() => handleDelete(u._id, u.email)} title="Delete"><i className="fi fi-sr-trash"></i></button>
                         )}
                       </div>
                     </td>

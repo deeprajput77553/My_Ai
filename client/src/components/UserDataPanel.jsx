@@ -12,15 +12,15 @@ const CATEGORY_ICONS = {
 };
 
 function UserDataPanel() {
-  const [userData, setUserData]     = useState({ profile: [] });
-  const [loading, setLoading]       = useState(true);
-  const [editingId, setEditingId]   = useState(null);
-  const [editForm, setEditForm]     = useState({ key: "", value: "", category: "personal" });
-  const [addForm, setAddForm]       = useState({ key: "", value: "", category: "personal" });
-  const [showAdd, setShowAdd]       = useState(false);
-  const [filter, setFilter]         = useState("all");
-  const [saving, setSaving]         = useState(false);
-  const [toast, setToast]           = useState(null);
+  const [userData, setUserData] = useState({ profile: [] });
+  const [loading, setLoading] = useState(true);
+  const [editingId, setEditingId] = useState(null);
+  const [editForm, setEditForm] = useState({ key: "", value: "", category: "personal" });
+  const [addForm, setAddForm] = useState({ key: "", value: "", category: "personal" });
+  const [showAdd, setShowAdd] = useState(false);
+  const [filter, setFilter] = useState("all");
+  const [saving, setSaving] = useState(false);
+  const [toast, setToast] = useState(null);
 
   const showToast = (msg, type = "success") => {
     setToast({ msg, type });
@@ -92,7 +92,7 @@ function UserDataPanel() {
   return (
     <div className="udp-container">
       {toast && <div className={`udp-toast ${toast.type}`}>{toast.msg}</div>}
-      
+
       {/* Header */}
       <div className="udp-header">
         <div className="udp-header-title">
@@ -162,7 +162,7 @@ function UserDataPanel() {
       {/* Entries */}
       {filtered.length === 0 ? (
         <div className="udp-empty">
-          <div>🤖</div>
+          <div>✨</div>
           <p>No data yet. Chat with AI naturally — it will learn about you!</p>
         </div>
       ) : (
@@ -208,10 +208,12 @@ function UserDataPanel() {
                     </div>
                     <div className="udp-card-actions">
                       <span className="udp-source-badge">
-                        {entry.source === "chat" ? "🤖 AI" : "✍️ Manual"}
+                        {entry.source === "chat" ? "AI" : "Manual"}
                       </span>
                       <button className="udp-icon-btn" onClick={() => startEdit(entry)} title="Edit">✏️</button>
-                      <button className="udp-icon-btn del" onClick={() => handleDelete(entry._id)} title="Delete">🗑</button>
+                      <button className="udp-icon-btn del" onClick={() => handleDelete(entry._id)} title="Delete">
+                        <i className="fi fi-sr-trash"></i>
+                      </button>
                     </div>
                   </div>
                   <div className="udp-card-value">{entry.value}</div>

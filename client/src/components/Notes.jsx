@@ -271,21 +271,37 @@ function Notes({ onNotesSaved, preloadedNote }) {
       {/* ── Q&A Mode ── */}
       {mode === "qa" && questions.length > 0 && (
         <div className="qaSection">
+          <div className="qaHeader">
+            <div className="qaTitle">
+              <i className="fi fi-rr-interrogation"></i>
+              <span>Question Bank</span>
+            </div>
+            <div className="qaCountBadge">
+              {questions.length} Questions Found
+            </div>
+          </div>
+
           <div className="qaNav">
-            {questions.map((q, i) => (
-              <button
-                key={i}
-                className={`qaPill ${activeQ === i ? "activeQa" : ""} ${answers[i] ? "answered" : ""}`}
-                onClick={() => handleQaPillClick(i)}
-              >Q{i + 1}</button>
-            ))}
+            <div className="qaNavFlex">
+              {questions.map((q, i) => (
+                <button
+                  key={i}
+                  className={`qaPill ${activeQ === i ? "activeQa" : ""} ${answers[i] ? "answered" : ""}`}
+                  style={{ animationDelay: `${i * 0.05}s` }}
+                  onClick={() => handleQaPillClick(i)}
+                >
+                  <span className="qaPillCircle">{i + 1}</span>
+                  <span className="qaPillPrompt">{q.slice(0, 30)}{q.length > 30 ? "…" : ""}</span>
+                </button>
+              ))}
+            </div>
             {Object.keys(answers).length > 0 && (
               <div className="downloadAllBtns">
                 <button className="downloadBtn" onClick={() => downloadAllQA("pdf")}>
-                  ⬇ All PDF
+                  <i className="fi fi-sr-file-pdf"></i> PDF
                 </button>
                 <button className="downloadBtn docx" onClick={() => downloadAllQA("docx")}>
-                  ⬇ All DOCX
+                  <i className="fi fi-sr-file-word"></i> DOCX
                 </button>
               </div>
             )}

@@ -3,14 +3,14 @@ import { useAuth } from "../contexts/AuthContext";
 import "./Sidebar.css";
 
 const NAV_ITEMS = [
-  { id: "chat",      symbol: "Chat" },
-  { id: "notes",     symbol: "Notes" },
-  { id: "reminders", symbol: "Reminders" },
-  { id: "userdata",  symbol: "My Data" },
-  { id: "settings",  symbol: "Settings" },
+  { id: "chat",      symbol: "Chat",      uicon: "fi fi-rr-messages" },
+  { id: "notes",     symbol: "Notes",     uicon: "fi fi-rr-edit" },
+  { id: "reminders", symbol: "Reminders", uicon: "fi fi-rr-bell" },
+  { id: "userdata",  symbol: "My Data",   uicon: "fi fi-rr-data-transfer" },
+  { id: "settings",  symbol: "Settings",  uicon: "fi fi-rr-settings" },
 ];
 
-const ADMIN_NAV = { id: "admin", symbol: "Admin Panel" };
+const ADMIN_NAV = { id: "admin", symbol: "Admin Panel", uicon: "fi fi-rr-shield-check" };
 
 function Sidebar({
   conversations, setConversations,
@@ -20,7 +20,8 @@ function Sidebar({
   open, setOpen,
   activeTab, onTabChange,
 }) {
-  const { isAdmin } = useAuth();
+  const { user, isAdmin } = useAuth();
+  const firstLetter = user?.name ? user.name.charAt(0).toUpperCase() : "A";
 
   const handleDeleteChat = async (e, id) => {
     e.stopPropagation();
@@ -63,7 +64,7 @@ function Sidebar({
 
         {/* ── Logo / Brand ── */}
         <div className="sidebar-brand">
-          <div className="sidebar-brand-icon">A</div>
+          <div className="sidebar-brand-icon">{firstLetter}</div>
           <span className="sidebar-brand-name">OLLAMA AI</span>
           <button className="sidebar-close-btn" onClick={() => setOpen(false)}>×</button>
         </div>
@@ -77,7 +78,7 @@ function Sidebar({
               onClick={() => handleNavClick(item.id)}
               id={`sidebar-nav-${item.id}`}
             >
-              <span className={`sidebar-nav-icon icon-${item.id}`} aria-hidden="true" />
+              <i className={`${item.uicon} sidebar-nav-uicon`} aria-hidden="true" />
               <span className="sidebar-nav-label">{item.symbol}</span>
             </button>
           ))}
@@ -114,7 +115,7 @@ function Sidebar({
                       className="sidebar-delete-btn"
                       onClick={(e) => handleDeleteChat(e, conv._id)}
                       title="Delete"
-                    >🗑</button>
+                    ><i className="fi fi-sr-trash"></i></button>
                   </div>
                 ))
               )}
@@ -145,7 +146,7 @@ function Sidebar({
                       className="sidebar-delete-btn"
                       onClick={(e) => handleDeleteNote(e, i)}
                       title="Delete"
-                    >🗑</button>
+                    ><i className="fi fi-sr-trash"></i></button>
                   </div>
                 ))
               )}

@@ -246,9 +246,9 @@ function SettingsPanel() {
 
       {/* === Danger Zone === */}
       <Section title="⚠ Danger Zone">
-        <SettingRow icon="🗑️" label="Delete Account" description="Permanently delete your account and all data">
+        <SettingRow icon={<i className="fi fi-sr-trash"></i>} label="Delete Account" description="Permanently delete your account and all data">
           <button className="sp-danger-btn" onClick={() => setShowDeleteAccount(true)}>
-            Delete Account
+            <i className="fi fi-sr-trash"></i> Delete Account
           </button>
         </SettingRow>
       </Section>
