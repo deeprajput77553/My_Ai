@@ -1,3 +1,5 @@
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&display=swap');
+
 /* ===== CSS VARIABLES (set by SettingsContext) ===== */
 :root {
   --bg-primary:    #0b0f1a;
@@ -65,7 +67,6 @@
 [data-theme="light"] .chatBox { background: transparent; }
 
 /* ===== GLOBAL RESETS ===== */
-@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&display=swap');
 
 * { box-sizing: border-box; margin: 0; padding: 0; }
 
@@ -345,12 +346,18 @@ html, body {
   padding: 14px 18px;
   border-radius: 18px;
   max-width: 70%;
-  word-break: break-word;
+  width: fit-content;
+  overflow-wrap: break-word;
+  word-wrap: break-word; /* legacy support */
+  word-break: normal; 
   white-space: pre-wrap;
   line-height: 1.65;
   font-size: var(--font-size-base, 14px);
   text-align: left;
   position: relative;
+}
+.userMsgWrapper .userMsg {
+  max-width: 100%; /* User wrapper already limits width to 70% */
 }
 
 /* ── User bubble: holographic gradient ── */

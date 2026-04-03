@@ -53,11 +53,78 @@ const extractByRegex = (message) => {
 
 // ── Regex-based reminder/event extraction ────────────────────────────────────
 const REMINDER_PATTERNS = [
-  { regex: /(?:exam|test|quiz|assessment) (?:on|at|next|this)? ?([A-Za-z0-9\s,]+)/i, category: "exam", titlePrefix: "Exam" },
-  { regex: /(?:assignment|homework|project|submission) (?:due|on|by)? ?([A-Za-z0-9\s,]+)/i, category: "task", titlePrefix: "Assignment" },
-  { regex: /(?:meeting|interview|presentation) (?:on|at|next|this)? ?([A-Za-z0-9\s,]+)/i, category: "event", titlePrefix: "Meeting" },
-  { regex: /remind me (?:to|about)? (.+?) (?:on|at|by|in|next)/i, category: "reminder", titlePrefix: "Reminder" },
+  { regex: /remind me (?:to|about|that)?\s*(.+?)(?:\s+(?:on|at|by|in|next|tomorrow|today))/i, category: "reminder", titlePrefix: "Reminder" },
+  { regex: /remind me (?:to|about|that)?\s*(.{5,80}?)(?:\.|$)/i, category: "reminder", titlePrefix: "Reminder" },
+  { regex: /(?:i have|my|there(?:'s| is)|got)\s+(?:an?\s+)?(\w[\w\s]*?)\s*(?:exam|test|quiz|assessment)/i, category: "exam", titlePrefix: "Exam" },
+  { regex: /(\w[\w\s]*?)(?:exam|test|quiz)\s+(?:is\s+)?(?:on|at|next|this|tomorrow|scheduled)/i, category: "exam", titlePrefix: "Exam" },
+  { regex: /(?:exam|test|quiz|assessment)\s+(?:on|at|next|this|for)?\s*(.{3,60})/i, category: "exam", titlePrefix: "Exam" },
+  { regex: /(?:assignment|homework|project|submission|deadline)\s+(?:is\s+)?(?:due|on|by)?\s*(.{3,60})/i, category: "task", titlePrefix: "Assignment" },
+  { regex: /(?:submit|turn in|hand in)\s+(.{3,60})\s+(?:by|before|on)/i, category: "task", titlePrefix: "Submit" },
+  { regex: /deadline\s+(?:is\s+|for\s+)?(.{3,60})/i, category: "task", titlePrefix: "Deadline" },
+  { regex: /(?:meeting|interview|presentation|appointment|call)\s+(?:is\s+)?(?:on|at|next|this|scheduled|tomorrow)?\s*(.{3,60})/i, category: "event", titlePrefix: "Meeting" },
+  { regex: /(?:have|got)\s+(?:a\s+)?(?:meeting|interview|presentation|appointment)\s+(?:with|about|on|at)?\s*(.{3,60})/i, category: "event", titlePrefix: "Meeting" },
+  { regex: /(?:don't forget|remember)\s+(?:to|about)?\s*(.{5,60})/i, category: "reminder", titlePrefix: "Reminder" },
 ];
+
+// ── Date parsing helper (relative + absolute) ─────────────────────────────────
+const parseRelativeDate = (text) => {
+  if (!text) return null;
+  const lower = text.toLowerCase().trim();
+  const now = new Date();
+
+  if (lower.includes("day after tomorrow")) {
+    const d = new Date(now); d.setDate(d.getDate() + 2); d.setHours(9, 0, 0, 0); return d.toISOString();
+  }
+  if (lower.includes("tomorrow")) {
+    const d = new Date(now); d.setDate(d.getDate() + 1); d.setHours(9, 0, 0, 0); return d.toISOString();
+  }
+  if (lower.includes("tonight")) {
+    const d = new Date(now); d.setHours(20, 0, 0, 0); return d.toISOString();
+  }
+  if (/\btoday\b/.test(lower)) {
+    const d = new Date(now); d.setHours(17, 0, 0, 0); return d.toISOString();
+  }
+  const inMatch = lower.match(/in\s+(\d+)\s+(day|hour|week|month)s?/);
+  if (inMatch) {
+    const n = parseInt(inMatch[1]); const d = new Date(now);
+    if (inMatch[2] === "day") d.setDate(d.getDate() + n);
+    if (inMatch[2] === "hour") d.setHours(d.getHours() + n);
+    if (inMatch[2] === "week") d.setDate(d.getDate() + n * 7);
+    if (inMatch[2] === "month") d.setMonth(d.getMonth() + n);
+    return d.toISOString();
+  }
+  const dayNames = ["sunday","monday","tuesday","wednesday","thursday","friday","saturday"];
+  const nextDay = lower.match(/next\s+(monday|tuesday|wednesday|thursday|friday|saturday|sunday)/);
+  if (nextDay) {
+    const target = dayNames.indexOf(nextDay[1]); const d = new Date(now);
+    let ahead = target - d.getDay(); if (ahead <= 0) ahead += 7;
+    d.setDate(d.getDate() + ahead); d.setHours(9, 0, 0, 0); return d.toISOString();
+  }
+  if (lower.includes("next week")) {
+    const d = new Date(now); d.setDate(d.getDate() + 7); d.setHours(9, 0, 0, 0); return d.toISOString();
+  }
+  // Explicit dates: "10th April", "April 10", "10/04/2026"
+  const months = { jan:0,feb:1,mar:2,apr:3,may:4,jun:5,jul:6,aug:7,sep:8,oct:9,nov:10,dec:11 };
+  const m1 = lower.match(/(\d{1,2})(?:st|nd|rd|th)?\s+(jan|feb|mar|apr|may|jun|jul|aug|sep|oct|nov|dec)\w*(?:\s+(\d{4}))?/);
+  if (m1) {
+    const d = new Date(m1[3] ? parseInt(m1[3]) : now.getFullYear(), months[m1[2].slice(0,3)], parseInt(m1[1]), 9, 0, 0);
+    if (d < now) d.setFullYear(d.getFullYear() + 1); return d.toISOString();
+  }
+  const m2 = lower.match(/(jan|feb|mar|apr|may|jun|jul|aug|sep|oct|nov|dec)\w*\s+(\d{1,2})(?:st|nd|rd|th)?(?:\s*,?\s*(\d{4}))?/);
+  if (m2) {
+    const d = new Date(m2[3] ? parseInt(m2[3]) : now.getFullYear(), months[m2[1].slice(0,3)], parseInt(m2[2]), 9, 0, 0);
+    if (d < now) d.setFullYear(d.getFullYear() + 1); return d.toISOString();
+  }
+  const timeM = lower.match(/at\s+(\d{1,2})(?::(\d{2}))?\s*(am|pm)?/);
+  if (timeM) {
+    let h = parseInt(timeM[1]); const min = timeM[2] ? parseInt(timeM[2]) : 0;
+    if (timeM[3] === "pm" && h < 12) h += 12;
+    if (timeM[3] === "am" && h === 12) h = 0;
+    const d = new Date(now); d.setHours(h, min, 0, 0);
+    if (d < now) d.setDate(d.getDate() + 1); return d.toISOString();
+  }
+  return null;
+};
 
 const extractRemindersRegex = (message) => {
   const results = [];
@@ -66,11 +133,12 @@ const extractRemindersRegex = (message) => {
     if (match && match[1]) {
       const desc = match[1].trim().slice(0, 80);
       if (desc.length > 2) {
+        const parsedDate = parseRelativeDate(message);
         results.push({
           title: `${titlePrefix}: ${desc}`,
           description: message.slice(0, 200),
           category,
-          dueDate: null,
+          dueDate: parsedDate,
           timetable: [],
         });
       }
@@ -78,6 +146,7 @@ const extractRemindersRegex = (message) => {
   }
   return results;
 };
+
 
 // ── Save extracted data to DB ─────────────────────────────────────────────────
 const saveProfileItems = async (userId, items) => {
@@ -179,22 +248,40 @@ Message: "${message.slice(0, 300)}"`;
 // ── Extract reminders from message ────────────────────────────────────────────
 export const extractRemindersFromMessage = async (message, userId) => {
   try {
-    // Fast regex check first
     const regexReminders = extractRemindersRegex(message);
     
-    // Only try AI for reminder extraction if message mentions time-sensitive stuff
-    const TIME_WORDS = ["exam", "test", "quiz", "deadline", "due", "submit", "assignment", "project", "remind", "schedule", "next week", "tomorrow", "tonight", "meeting", "interview"];
+    // Broader trigger set — catch natural language about schedules
+    const TIME_WORDS = [
+      "exam", "test", "quiz", "deadline", "due", "submit", "assignment", 
+      "project", "remind", "schedule", "next week", "tomorrow", "tonight", 
+      "meeting", "interview", "don't forget", "remember to", "appointment",
+      "presentation", "in 2 days", "in 3 days", "next monday", "next tuesday",
+      "next wednesday", "next thursday", "next friday", "by friday", "by monday",
+      "this weekend", "need to finish", "hand in", "turn in", "planned", "scheduled",
+      "january", "february", "march", "april", "may", "june", "july",
+      "august", "september", "october", "november", "december",
+    ];
     const hasTimeContext = TIME_WORDS.some(w => message.toLowerCase().includes(w));
     
     let aiReminders = [];
     if (hasTimeContext) {
       try {
-        const now = new Date().toISOString().split("T")[0];
-        const prompt = `Today: ${now}. Extract any reminders/events/exams from this message.
-Return JSON array ONLY: [{"title":"Math Exam","description":"","dueDate":"2026-04-10","category":"exam"}]
+        const now = new Date();
+        const todayStr = now.toISOString().split("T")[0];
+        const dayOfWeek = ["Sunday","Monday","Tuesday","Wednesday","Thursday","Friday","Saturday"][now.getDay()];
+        
+        const prompt = `Today is ${dayOfWeek}, ${todayStr}. Extract ALL reminders, exams, deadlines, meetings from this message.
+
+RULES:
+- "tomorrow" = ${new Date(now.getTime() + 86400000).toISOString().split("T")[0]}
+- "next week" = 7 days from today
+- Parse month names: "April 10" = 2026-04-10
+- If no date but time-sensitive, pick the most logical upcoming date
+- Return [] if nothing time-sensitive
+
+Return JSON ONLY: [{"title":"Math Exam","description":"","dueDate":"2026-04-10T09:00:00.000Z","category":"exam"}]
 Categories: exam, event, task, reminder, other
-Return [] if none found. JSON ONLY.
-Message: "${message.slice(0, 300)}"`;
+Message: "${message.slice(0, 400)}"`;
         
         const response = await generateResponse(prompt, "chat");
         const parsed = parseJsonFromText(response.replace(/```json|```/g, "").trim());
@@ -211,8 +298,8 @@ Message: "${message.slice(0, 300)}"`;
     if (!userData) userData = new UserData({ userId, profile: [], reminders: [] });
     
     for (const item of toSave) {
-      // Avoid duplicates by title
-      const exists = userData.reminders.some(r => r.title.toLowerCase() === item.title.toLowerCase());
+      const normalTitle = item.title.toLowerCase().trim();
+      const exists = userData.reminders.some(r => r.title.toLowerCase().trim() === normalTitle);
       if (exists) continue;
       
       userData.reminders.push({

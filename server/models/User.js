@@ -27,6 +27,16 @@ const userSchema = new mongoose.Schema(
       required: true,
       trim: true
     },
+    role: {
+      type: String,
+      enum: ["user", "admin"],
+      default: "user",
+    },
+    status: {
+      type: String,
+      enum: ["pending", "active", "blocked"],
+      default: "active", // first admin will be auto-active, new signups can be set to pending by admin config
+    },
     preferences: { 
       type: userPreferencesSchema, 
       default: () => ({}) 

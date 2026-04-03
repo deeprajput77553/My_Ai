@@ -5,6 +5,7 @@ import { searchImages } from "../services/imageService.js";
 import { fetchWeather, extractLocationFromQuery } from "../services/weatherService.js";
 import { fetchNews } from "../services/newsService.js";
 import { extractUserDataFromMessage, extractRemindersFromMessage } from "./userDataController.js";
+import UserData from "../models/UserData.js";
 
 // ── System Prompts ────────────────────────────────────────────────────────────
 const CHAT_SYSTEM = `You are a smart, friendly AI assistant. Be concise and helpful.
@@ -102,6 +103,19 @@ export const sendMessage = async (req, res) => {
       .map((m) => `${m.role === "user" ? "User" : "Assistant"}: ${m.content}`)
       .join("\n");
 
+    // Fetch personal data / reminders context for the AI
+    const userDataInfo = await UserData.findOne({ userId });
+    let personalContext = "";
+    if (userDataInfo) {
+      if (userDataInfo.profile?.length > 0) {
+        personalContext += "User Info:\n" + userDataInfo.profile.map(p => `- ${p.key}: ${p.value}`).join("\n") + "\n";
+      }
+      const upcomingReminders = userDataInfo.reminders?.filter(r => !r.completed);
+      if (upcomingReminders?.length > 0) {
+        personalContext += "Reminders:\n" + upcomingReminders.map(r => `- ${r.title}`).join("\n") + "\n";
+      }
+    }
+
     // ── Run data fetches in parallel based on query type ──────────────────────
     let weatherData = null;
     let newsData    = [];
@@ -147,6 +161,10 @@ export const sendMessage = async (req, res) => {
 
     // ── Build AI prompt ───────────────────────────────────────────────────────
     let aiPrompt = systemPrompt + "\n\n";
+
+    if (personalContext) {
+      aiPrompt += `BACKGROUND CONTEXT ABOUT THE USER:\n${personalContext}\nUse this info if it answers the user's question or adds relevant personalization.\n\n`;
+    }
 
     if (historyContext) {
       aiPrompt += `Previous messages:\n${historyContext}\n\n`;

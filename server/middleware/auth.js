@@ -106,3 +106,39 @@ export const optionalAuth = async (req, res, next) => {
     next();
   }
 };
+
+/**
+ * Admin authorization middleware
+ * Must be used AFTER authenticate middleware
+ */
+export const isAdmin = (req, res, next) => {
+  if (!req.user || req.user.role !== "admin") {
+    return res.status(403).json({
+      success: false,
+      error: { code: "FORBIDDEN", message: "Admin access required" },
+    });
+  }
+  next();
+};
+
+/**
+ * Active user check middleware
+ * Blocks pending or blocked users from accessing the app
+ * Must be used AFTER authenticate middleware
+ */
+export const isActive = (req, res, next) => {
+  if (!req.user) return next();
+  if (req.user.status === "blocked") {
+    return res.status(403).json({
+      success: false,
+      error: { code: "ACCOUNT_BLOCKED", message: "Your account has been blocked. Contact admin." },
+    });
+  }
+  if (req.user.status === "pending") {
+    return res.status(403).json({
+      success: false,
+      error: { code: "ACCOUNT_PENDING", message: "Your account is pending admin approval." },
+    });
+  }
+  next();
+};

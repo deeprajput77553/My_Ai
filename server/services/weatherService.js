@@ -8,20 +8,33 @@ import axios from "axios";
 // Extract location from the query string
 // e.g. "weather in mumbai" → "mumbai"
 export const extractLocationFromQuery = (query) => {
+  // First clean up things like "what's the", "how is the", etc.
+  let cleanQuery = query.toLowerCase()
+    .replace(/^(what is|what's|how is|how's|show me|tell me|find)( the)?\s+/i, "")
+    .trim();
+
   const patterns = [
-    /weather\s+(?:in|at|for|of)\s+(.+)/i,
-    /(.+?)\s+weather/i,
-    /mausam\s+(.+)/i,
-    /temperature\s+(?:in|at|of)\s+(.+)/i,
-    /forecast\s+(?:in|at|for)\s+(.+)/i,
+    /(?:weather|mausam|temperature|forecast)\s+(?:in|at|for|of)?\s*(.+)/i,
+    /(.+?)\s+(?:weather|mausam|temperature|forecast)/i,
+    /\b(\d{5,6})\b/, // Match 5 or 6 digit ZIP/PIN codes
   ];
+
   for (const p of patterns) {
-    const m = query.match(p);
-    if (m && m[1]) {
-      // Clean up: remove question marks, trailing words like "today/now"
-      return m[1].replace(/[?!.,]/g, "").replace(/\s*(today|now|current|right now)\s*/gi, "").trim();
+    const m = cleanQuery.match(p);
+    if (m && (m[1] || m[2])) {
+      let loc = m[1] || m[2];
+      // Clean up punctuation and time words
+      loc = loc.replace(/[?!.,]/g, "").replace(/\s*(today|now|current|right now|tonight|tomorrow)\s*/gi, "").trim();
+      if (loc && loc !== "the") return loc;
     }
   }
+  
+  // Last resort: if it's a short query (just 1 or 2 words), assume it's a place
+  const words = cleanQuery.split(/\s+/);
+  if (words.length <= 2 && !/^(hi|hello|what|how|who|thanks|ok)$/i.test(words[0])) {
+    return cleanQuery.replace(/[?!.,]/g, "").trim();
+  }
+
   return null;
 };
 
@@ -44,7 +57,6 @@ export const fetchWeather = async (location) => {
   if (!location) return null;
   
   try {
-    // wttr.in JSON API − free, no key required
     const url = `https://wttr.in/${encodeURIComponent(location)}?format=j1`;
     const { data } = await axios.get(url, {
       headers: { "User-Agent": "OllamaAI/1.0" },
@@ -55,13 +67,23 @@ export const fetchWeather = async (location) => {
 
     const cc = data.current_condition[0];
     const area = data.nearest_area?.[0];
-    const areaName = area?.areaName?.[0]?.value || location;
+    
+    // Construct readable display name: Area, Region, Country
+    const areaName = area?.areaName?.[0]?.value || "";
+    const region = area?.region?.[0]?.value || "";
     const country = area?.country?.[0]?.value || "";
+    
+    let displayName = areaName;
+    if (region && region.toLowerCase() !== areaName.toLowerCase()) {
+      displayName += (displayName ? `, ${region}` : region);
+    }
+    if (country) displayName += (displayName ? `, ${country}` : country);
+    
+    if (!displayName || displayName.trim() === ",") displayName = location;
+
     const codeStr = cc.weatherCode || "116";
     const cond = getCondition(codeStr);
 
-    // Today's forecast
-    const todayFc = data.weather?.[0];
     const forecast = (data.weather || []).slice(0, 4).map(d => ({
       date: d.date,
       high: parseFloat(d.maxtempC),
@@ -71,7 +93,8 @@ export const fetchWeather = async (location) => {
     }));
 
     return {
-      location: `${areaName}${country ? ", " + country : ""}`,
+      location: displayName,
+      queryLocation: location,
       current: {
         temperature: parseFloat(cc.temp_C),
         feelsLike:   parseFloat(cc.FeelsLikeC),
