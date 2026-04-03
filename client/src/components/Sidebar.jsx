@@ -1,13 +1,16 @@
 import { deleteChat } from "../api";
+import { useAuth } from "../contexts/AuthContext";
 import "./Sidebar.css";
 
 const NAV_ITEMS = [
-  { id: "chat",      icon: "\u2022", symbol: "Chat" },
-  { id: "notes",     icon: "\u2022", symbol: "Notes" },
-  { id: "reminders", icon: "\u2022", symbol: "Reminders" },
-  { id: "userdata",  icon: "\u2022", symbol: "My Data" },
-  { id: "settings",  icon: "\u2022", symbol: "Settings" },
+  { id: "chat",      symbol: "Chat" },
+  { id: "notes",     symbol: "Notes" },
+  { id: "reminders", symbol: "Reminders" },
+  { id: "userdata",  symbol: "My Data" },
+  { id: "settings",  symbol: "Settings" },
 ];
+
+const ADMIN_NAV = { id: "admin", symbol: "Admin Panel" };
 
 function Sidebar({
   conversations, setConversations,
@@ -17,6 +20,7 @@ function Sidebar({
   open, setOpen,
   activeTab, onTabChange,
 }) {
+  const { isAdmin } = useAuth();
 
   const handleDeleteChat = async (e, id) => {
     e.stopPropagation();
@@ -48,8 +52,10 @@ function Sidebar({
 
   const handleNavClick = (tabId) => {
     onTabChange(tabId);
-    if (window.innerWidth <= 768) setOpen(false); // close on mobile
+    if (window.innerWidth <= 768) setOpen(false);
   };
+
+  const navItems = isAdmin ? [...NAV_ITEMS, ADMIN_NAV] : NAV_ITEMS;
 
   return (
     <>
@@ -64,10 +70,10 @@ function Sidebar({
 
         {/* ── Navigation ── */}
         <nav className="sidebar-nav">
-          {NAV_ITEMS.map(item => (
+          {navItems.map(item => (
             <button
               key={item.id}
-              className={`sidebar-nav-item ${activeTab === item.id ? "active" : ""}`}
+              className={`sidebar-nav-item ${activeTab === item.id ? "active" : ""} ${item.id === "admin" ? "admin-nav" : ""}`}
               onClick={() => handleNavClick(item.id)}
               id={`sidebar-nav-${item.id}`}
             >
@@ -147,12 +153,13 @@ function Sidebar({
           </div>
         )}
 
-        {(activeTab === "reminders" || activeTab === "userdata" || activeTab === "settings") && (
+        {(activeTab === "reminders" || activeTab === "userdata" || activeTab === "settings" || activeTab === "admin") && (
           <div className="sidebar-panel sidebar-info-panel">
             <div className="sidebar-info-text">
               {activeTab === "reminders" && "View upcoming exams, events and deadlines in the main area."}
               {activeTab === "userdata" && "AI learns from your chats and stores your personal info here."}
               {activeTab === "settings" && "Adjust theme, font size, account and AI preferences."}
+              {activeTab === "admin" && "Manage users, approve registrations, and assign roles."}
             </div>
           </div>
         )}

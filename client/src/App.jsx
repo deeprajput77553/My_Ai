@@ -14,6 +14,7 @@ import NewsWidget from "./components/NewsWidget";
 import RemindersPanel from "./components/RemindersPanel";
 import UserDataPanel from "./components/UserDataPanel";
 import SettingsPanel from "./components/SettingsPanel";
+import AdminPanel from "./components/AdminPanel";
 import "./App.css";
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -236,7 +237,7 @@ function App() {
       const res  = await getConversation(conv._id);
       const full = res.data;
       setConversationId(full._id);
-      setDisplayedMessages(full.messages.map((m, i) => ({ ...m, _displayId: `${full._id}_${i}` })));
+      setDisplayedMessages(full.messages.map((m, i) => ({ ...m, _displayId: `${full._id}_${i}`, _timestamp: m.timestamp || m.createdAt || null })));
       setTypingId(null);
       setMsgMeta({});
       setActiveTab("chat");
@@ -252,20 +253,35 @@ function App() {
     voice.stopSpeaking();
   };
 
+  // Format timestamp for message display
+  const formatMsgTime = (ts) => {
+    if (!ts) return "";
+    const d = new Date(ts);
+    const now = new Date();
+    const isToday = d.toDateString() === now.toDateString();
+    const yesterday = new Date(now); yesterday.setDate(now.getDate() - 1);
+    const isYesterday = d.toDateString() === yesterday.toDateString();
+    const time = d.toLocaleTimeString("en-IN", { hour: "2-digit", minute: "2-digit", hour12: true });
+    if (isToday) return `Today, ${time}`;
+    if (isYesterday) return `Yesterday, ${time}`;
+    return d.toLocaleDateString("en-IN", { day: "2-digit", month: "short" }) + `, ${time}`;
+  };
+
   const doSend = useCallback(async (text, convId = null) => {
     const resolvedConvId = convId ?? conversationId;
     if (!text?.trim() || loading) return;
     voice.stopSpeaking();
     setLoading(true);
     setMessage("");
-    const userDisplayId = `user_${Date.now()}`;
-    const aiDisplayId   = `ai_${Date.now() + 1}`;
-    setDisplayedMessages((prev) => [...prev, { role: "user", content: text, _displayId: userDisplayId }]);
+    const now = Date.now();
+    const userDisplayId = `user_${now}`;
+    const aiDisplayId   = `ai_${now + 1}`;
+    setDisplayedMessages((prev) => [...prev, { role: "user", content: text, _displayId: userDisplayId, _timestamp: now }]);
     try {
       const res = await sendMessage(text, resolvedConvId);
       const { conversationId: newConvId, aiMessage, searchResults, images, searchQuery, modelUsed, weather, news } = res.data;
       setConversationId(newConvId);
-      setDisplayedMessages((prev) => [...prev, { role: "ai", content: aiMessage, _displayId: aiDisplayId }]);
+      setDisplayedMessages((prev) => [...prev, { role: "ai", content: aiMessage, _displayId: aiDisplayId, _timestamp: Date.now() }]);
       setTypingId(aiDisplayId);
       setMsgMeta((prev) => ({
         ...prev,
@@ -403,6 +419,7 @@ function App() {
                     {userM && (
                       <div className="userRow">
                         <UserMessage content={userM.content} onResend={(t) => handleResend(pairStart, t)} />
+                        {userM._timestamp && <span className="msg-timestamp msg-timestamp-right">{formatMsgTime(userM._timestamp)}</span>}
                       </div>
                     )}
                     {aiM && (
@@ -419,6 +436,7 @@ function App() {
                                 ? <TypingMessage text={aiM.content} onDone={handleTypingDone} />
                                 : <ChatMarkdown content={aiM.content} />}
                             </div>
+                            {aiM._timestamp && <span className="msg-timestamp">{formatMsgTime(aiM._timestamp)}</span>}
                           </div>
                         </div>
 
@@ -514,6 +532,9 @@ function App() {
 
           {/* Settings */}
           {activeTab === "settings" && <SettingsPanel />}
+
+          {/* Admin */}
+          {activeTab === "admin" && <AdminPanel />}
         </div>
       </div>
     </div>

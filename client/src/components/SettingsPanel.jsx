@@ -37,9 +37,60 @@ function Section({ title, children }) {
 
 function SettingsPanel() {
   const { settings, updateSetting, resetSettings } = useSettings();
-  const { user, logout } = useAuth();
+  const { user, logout, deleteAccount, updateProfile, updateEmail, changePassword } = useAuth();
   const [showReset, setShowReset] = useState(false);
   const [showLogout, setShowLogout] = useState(false);
+  const [showDeleteAccount, setShowDeleteAccount] = useState(false);
+  const [deletePassword, setDeletePassword] = useState("");
+  const [deleteError, setDeleteError] = useState("");
+  const [deleting, setDeleting] = useState(false);
+
+  // Edit Profile
+  const [editName, setEditName] = useState(false);
+  const [newName, setNewName] = useState("");
+  const [nameMsg, setNameMsg] = useState(null);
+
+  // Change Email
+  const [editEmail, setEditEmail] = useState(false);
+  const [emailForm, setEmailForm] = useState({ email: "", password: "" });
+  const [emailMsg, setEmailMsg] = useState(null);
+
+  // Change Password
+  const [editPwd, setEditPwd] = useState(false);
+  const [pwdForm, setPwdForm] = useState({ current: "", newPwd: "" });
+  const [pwdMsg, setPwdMsg] = useState(null);
+
+  const handleDeleteAccount = async () => {
+    if (!deletePassword.trim()) { setDeleteError("Password is required"); return; }
+    setDeleting(true);
+    setDeleteError("");
+    const result = await deleteAccount(deletePassword);
+    if (!result.success) { setDeleteError(result.error); setDeleting(false); }
+  };
+
+  const handleUpdateName = async () => {
+    if (!newName.trim()) return;
+    const r = await updateProfile(newName.trim());
+    if (r.success) { setEditName(false); setNameMsg({ t: "success", m: "Name updated!" }); }
+    else setNameMsg({ t: "error", m: r.error });
+    setTimeout(() => setNameMsg(null), 3000);
+  };
+
+  const handleUpdateEmail = async () => {
+    if (!emailForm.email.trim() || !emailForm.password) return;
+    const r = await updateEmail(emailForm.email.trim(), emailForm.password);
+    if (r.success) { setEditEmail(false); setEmailForm({ email: "", password: "" }); setEmailMsg({ t: "success", m: "Email updated!" }); }
+    else setEmailMsg({ t: "error", m: r.error });
+    setTimeout(() => setEmailMsg(null), 3000);
+  };
+
+  const handleChangePwd = async () => {
+    if (!pwdForm.current || !pwdForm.newPwd) return;
+    const r = await changePassword(pwdForm.current, pwdForm.newPwd);
+    if (r.success) { setEditPwd(false); setPwdForm({ current: "", newPwd: "" }); setPwdMsg({ t: "success", m: "Password changed!" }); }
+    else setPwdMsg({ t: "error", m: r.error });
+    setTimeout(() => setPwdMsg(null), 3000);
+  };
 
   return (
     <div className="sp-container">
@@ -52,30 +103,73 @@ function SettingsPanel() {
       </div>
 
       {/* === Account === */}
-      <Section title="👤 Account">
+      <Section title="Account">
         <div className="sp-account-card">
           <div className="sp-avatar">
             {user?.name?.[0]?.toUpperCase() || "U"}
           </div>
           <div className="sp-account-info">
-            <div className="sp-account-name">{user?.name || "User"}</div>
+            <div className="sp-account-name">{user?.name || "User"} {user?.role === "admin" && <span className="sp-admin-badge">Admin</span>}</div>
             <div className="sp-account-email">{user?.email || ""}</div>
           </div>
         </div>
-        <SettingRow icon="🔒" label="Logout" description="Sign out of your account">
-          <button className="sp-danger-btn" onClick={() => setShowLogout(true)}>
-            Logout
-          </button>
+
+        {/* Edit Name */}
+        <SettingRow icon="✏️" label="Edit Name" description="Change your display name">
+          {editName ? (
+            <div className="sp-inline-form">
+              <input className="sp-inline-input" value={newName} onChange={e => setNewName(e.target.value)} placeholder="New name" autoFocus />
+              <button className="sp-save-btn-sm" onClick={handleUpdateName}>Save</button>
+              <button className="sp-cancel-btn-sm" onClick={() => setEditName(false)}>✗</button>
+            </div>
+          ) : (
+            <button className="sp-secondary-btn" onClick={() => { setEditName(true); setNewName(user?.name || ""); }}>Edit</button>
+          )}
         </SettingRow>
-        <SettingRow icon="🔄" label="Switch Account" description="Log in with a different account">
-          <button className="sp-secondary-btn" onClick={() => setShowLogout(true)}>
-            Switch
-          </button>
+        {nameMsg && <div className={`sp-inline-msg ${nameMsg.t}`}>{nameMsg.m}</div>}
+
+        {/* Change Email */}
+        <SettingRow icon="📧" label="Change Email" description="Update your email address">
+          {editEmail ? (
+            <div className="sp-inline-form sp-inline-form-col">
+              <input className="sp-inline-input" value={emailForm.email} onChange={e => setEmailForm(p => ({ ...p, email: e.target.value }))} placeholder="New email" />
+              <input className="sp-inline-input" type="password" value={emailForm.password} onChange={e => setEmailForm(p => ({ ...p, password: e.target.value }))} placeholder="Confirm password" />
+              <div className="sp-inline-btns">
+                <button className="sp-save-btn-sm" onClick={handleUpdateEmail}>Save</button>
+                <button className="sp-cancel-btn-sm" onClick={() => setEditEmail(false)}>✗</button>
+              </div>
+            </div>
+          ) : (
+            <button className="sp-secondary-btn" onClick={() => setEditEmail(true)}>Change</button>
+          )}
+        </SettingRow>
+        {emailMsg && <div className={`sp-inline-msg ${emailMsg.t}`}>{emailMsg.m}</div>}
+
+        {/* Change Password */}
+        <SettingRow icon="🔑" label="Change Password" description="Update your password">
+          {editPwd ? (
+            <div className="sp-inline-form sp-inline-form-col">
+              <input className="sp-inline-input" type="password" value={pwdForm.current} onChange={e => setPwdForm(p => ({ ...p, current: e.target.value }))} placeholder="Current password" />
+              <input className="sp-inline-input" type="password" value={pwdForm.newPwd} onChange={e => setPwdForm(p => ({ ...p, newPwd: e.target.value }))} placeholder="New password" />
+              <div className="sp-inline-btns">
+                <button className="sp-save-btn-sm" onClick={handleChangePwd}>Save</button>
+                <button className="sp-cancel-btn-sm" onClick={() => setEditPwd(false)}>✗</button>
+              </div>
+            </div>
+          ) : (
+            <button className="sp-secondary-btn" onClick={() => setEditPwd(true)}>Change</button>
+          )}
+        </SettingRow>
+        {pwdMsg && <div className={`sp-inline-msg ${pwdMsg.t}`}>{pwdMsg.m}</div>}
+
+        <SettingRow icon="🔒" label="Logout" description="Sign out of your account">
+          <button className="sp-danger-btn" onClick={() => setShowLogout(true)}>Logout</button>
         </SettingRow>
       </Section>
 
+
       {/* === Display === */}
-      <Section title="🎨 Display">
+      <Section title="Display">
         <SettingRow icon="🌙" label="Theme" description="Choose between dark and light mode">
           <div className="sp-theme-toggle">
             <button
@@ -113,7 +207,7 @@ function SettingsPanel() {
       </Section>
 
       {/* === AI & Chat === */}
-      <Section title="🤖 AI & Chat">
+      <Section title="AI & Chat">
         <SettingRow icon="🔔" label="Notifications" description="Get browser notifications for reminders">
           <ToggleSwitch value={settings.notificationsEnabled} onChange={v => updateSetting("notificationsEnabled", v)} />
         </SettingRow>
@@ -141,7 +235,7 @@ function SettingsPanel() {
       </Section>
 
       {/* === Privacy === */}
-      <Section title="🔐 Privacy & Data">
+      <Section title="Privacy & Data">
         <SettingRow icon="🗂️" label="User Data Learning" description="Allow AI to learn from your messages">
           <ToggleSwitch value={true} onChange={() => {}} />
         </SettingRow>
@@ -150,12 +244,21 @@ function SettingsPanel() {
         </SettingRow>
       </Section>
 
+      {/* === Danger Zone === */}
+      <Section title="⚠ Danger Zone">
+        <SettingRow icon="🗑️" label="Delete Account" description="Permanently delete your account and all data">
+          <button className="sp-danger-btn" onClick={() => setShowDeleteAccount(true)}>
+            Delete Account
+          </button>
+        </SettingRow>
+      </Section>
+
       {/* === About === */}
-      <Section title="ℹ️ About">
+      <Section title="About">
         <div className="sp-about-card">
           <div className="sp-app-logo">✨</div>
           <div className="sp-app-name">OLLAMA AI</div>
-          <div className="sp-app-version">Version 2.0.0</div>
+          <div className="sp-app-version">Version 2.1.0</div>
           <div className="sp-app-desc">Powered by Llama 3, CodeLlama & Local AI</div>
         </div>
       </Section>
@@ -190,6 +293,35 @@ function SettingsPanel() {
             <div className="sp-confirm-actions">
               <button className="sp-cancel-btn" onClick={() => setShowReset(false)}>Cancel</button>
               <button className="sp-danger-confirm-btn" onClick={() => { resetSettings(); setShowReset(false); }}>Reset</button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Delete Account Modal */}
+      {showDeleteAccount && (
+        <div className="sp-confirm-overlay" onClick={() => { setShowDeleteAccount(false); setDeleteError(""); setDeletePassword(""); }}>
+          <div className="sp-confirm-modal sp-delete-modal" onClick={e => e.stopPropagation()}>
+            <div className="sp-confirm-icon">☠️</div>
+            <h3>Delete Your Account?</h3>
+            <p>This will <strong>permanently</strong> delete your account, all chats, notes, reminders, and personal data. This action <strong>cannot be undone</strong>.</p>
+            <div className="sp-delete-input-group">
+              <label className="sp-delete-label">Enter your password to confirm:</label>
+              <input
+                type="password"
+                className="sp-delete-input"
+                placeholder="Your password"
+                value={deletePassword}
+                onChange={e => { setDeletePassword(e.target.value); setDeleteError(""); }}
+                autoFocus
+              />
+              {deleteError && <div className="sp-delete-error">{deleteError}</div>}
+            </div>
+            <div className="sp-confirm-actions">
+              <button className="sp-cancel-btn" onClick={() => { setShowDeleteAccount(false); setDeleteError(""); setDeletePassword(""); }}>Cancel</button>
+              <button className="sp-danger-confirm-btn" onClick={handleDeleteAccount} disabled={deleting}>
+                {deleting ? "Deleting…" : "Delete Forever"}
+              </button>
             </div>
           </div>
         </div>
