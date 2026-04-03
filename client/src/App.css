@@ -20,16 +20,16 @@
   width: 100%;
 }
 
-/* ===== TOPBAR — STICKY ===== */
+/* ===== TOPBAR ===== */
 .topbar {
   display: flex;
   align-items: center;
   gap: 12px;
   padding: 12px 16px;
-  border-bottom: 1px solid rgba(255, 255, 255, 0.06);
-  background: rgba(11, 15, 26, 0.97);   /* ✅ solid bg so content doesn't bleed through */
+  border-bottom: 1px solid rgba(255,255,255,0.06);
+  background: rgba(11,15,26,0.97);
   backdrop-filter: blur(12px);
-  position: sticky;                       /* ✅ always on top */
+  position: sticky;
   top: 0;
   z-index: 50;
   flex-shrink: 0;
@@ -56,23 +56,18 @@
   line-height: 1;
   flex-shrink: 0;
 }
-
-.menuBtn:hover {
-  background: rgba(255, 255, 255, 0.06);
-  color: #e2e8f0;
-}
+.menuBtn:hover { background: rgba(255,255,255,0.06); color: #e2e8f0; }
 
 /* ===== TABS ===== */
 .tabs {
   display: flex;
   gap: 4px;
   margin-left: auto;
-  background: rgba(255, 255, 255, 0.04);
+  background: rgba(255,255,255,0.04);
   padding: 4px;
   border-radius: 10px;
-  border: 1px solid rgba(255, 255, 255, 0.06);
+  border: 1px solid rgba(255,255,255,0.06);
 }
-
 .tabBtn {
   padding: 6px 16px;
   border: none;
@@ -85,18 +80,14 @@
   transition: background 0.15s, color 0.15s;
   white-space: nowrap;
 }
-
-.tabBtn:hover {
-  color: #e2e8f0;
-}
-
+.tabBtn:hover { color: #e2e8f0; }
 .tabBtn.activeTab {
-  background: rgba(56, 189, 248, 0.15);
+  background: rgba(56,189,248,0.15);
   color: #38bdf8;
   font-weight: 600;
 }
 
-/* ===== CHAT AREA ===== */
+/* ===== CHAT BOX ===== */
 .chatBox {
   flex: 1;
   overflow-y: auto;
@@ -106,24 +97,14 @@
   gap: 10px;
   min-height: 0;
 }
+.chatBox::-webkit-scrollbar { width: 6px; }
+.chatBox::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.1); border-radius: 10px; }
+.chatBox::-webkit-scrollbar-track { background: transparent; }
 
-/* ===== MESSAGE BLOCK ===== */
-.messageBlock {
-  display: flex;
-  flex-direction: column;
-  gap: 5px;
-}
-
-/* ===== ROWS ===== */
-.userRow {
-  display: flex;
-  justify-content: flex-end;
-}
-
-.aiRow {
-  display: flex;
-  justify-content: flex-start;
-}
+/* ===== MESSAGE BLOCKS ===== */
+.messageBlock { display: flex; flex-direction: column; gap: 5px; }
+.userRow { display: flex; justify-content: flex-end; }
+.aiRow   { display: flex; justify-content: flex-start; }
 
 /* ===== BUBBLES ===== */
 .userMsg,
@@ -135,25 +116,21 @@
   white-space: pre-wrap;
   line-height: 1.5;
   font-size: 14px;
-  text-align: left;            /* ✅ fix center-align bleed from index.css */
+  text-align: left;
 }
-
 .userMsg {
   background: linear-gradient(135deg, #2563eb, #7c3aed);
   color: white;
-  box-shadow: 0 4px 15px rgba(59, 130, 246, 0.3);
-  text-align: left;
+  box-shadow: 0 4px 15px rgba(59,130,246,0.3);
 }
-
 .aiMsg {
-  background: rgba(30, 41, 59, 0.7);
-  border: 1px solid rgba(255, 255, 255, 0.07);
+  background: rgba(30,41,59,0.7);
+  border: 1px solid rgba(255,255,255,0.07);
   backdrop-filter: blur(6px);
   color: #e2e8f0;
-  text-align: left;
 }
 
-/* ===== USER MESSAGE WRAPPER (for edit button) ===== */
+/* ===== USER MESSAGE WRAPPER (edit) ===== */
 .userMsgWrapper {
   display: flex;
   flex-direction: column;
@@ -161,18 +138,8 @@
   gap: 4px;
   max-width: 70%;
 }
-
-.userMsgActions {
-  display: flex;
-  gap: 6px;
-  opacity: 0;
-  transition: opacity 0.15s;
-}
-
-.userMsgWrapper:hover .userMsgActions {
-  opacity: 1;
-}
-
+.userMsgActions { display: flex; gap: 6px; opacity: 0; transition: opacity 0.15s; }
+.userMsgWrapper:hover .userMsgActions { opacity: 1; }
 .userEditBtn {
   background: rgba(255,255,255,0.06);
   border: 1px solid rgba(255,255,255,0.1);
@@ -183,13 +150,7 @@
   cursor: pointer;
   transition: background 0.15s, color 0.15s;
 }
-
-.userEditBtn:hover {
-  background: rgba(56,189,248,0.1);
-  color: #38bdf8;
-  border-color: rgba(56,189,248,0.3);
-}
-
+.userEditBtn:hover { background: rgba(56,189,248,0.1); color: #38bdf8; border-color: rgba(56,189,248,0.3); }
 .userEditTextarea {
   width: 100%;
   min-width: 260px;
@@ -204,15 +165,8 @@
   outline: none;
   font-family: "Segoe UI", sans-serif;
 }
-
-.userEditActions {
-  display: flex;
-  gap: 6px;
-  justify-content: flex-end;
-}
-
-.userEditSave,
-.userEditCancel {
+.userEditActions { display: flex; gap: 6px; justify-content: flex-end; }
+.userEditSave, .userEditCancel {
   padding: 5px 12px;
   border-radius: 8px;
   font-size: 12px;
@@ -221,46 +175,36 @@
   border: none;
   transition: opacity 0.15s;
 }
-
-.userEditSave {
-  background: linear-gradient(135deg, #38bdf8, #6366f1);
-  color: white;
-}
-
-.userEditCancel {
-  background: rgba(255,255,255,0.06);
-  color: #94a3b8;
-  border: 1px solid rgba(255,255,255,0.08);
-}
+.userEditSave { background: linear-gradient(135deg, #38bdf8, #6366f1); color: white; }
+.userEditCancel { background: rgba(255,255,255,0.06); color: #94a3b8; border: 1px solid rgba(255,255,255,0.08); }
 
 /* ===== INPUT AREA ===== */
 .inputArea {
   display: flex;
-  gap: 10px;
-  padding: 15px;
-  border-top: 1px solid rgba(255, 255, 255, 0.05);
+  align-items: center;
+  gap: 8px;
+  padding: 14px 16px;
+  border-top: 1px solid rgba(255,255,255,0.05);
   flex-shrink: 0;
 }
-
 .input {
   flex: 1;
   padding: 12px 15px;
   border-radius: 12px;
-  border: 1px solid rgba(255, 255, 255, 0.07);
-  background: rgba(15, 23, 42, 0.8);
+  border: 1px solid rgba(255,255,255,0.07);
+  background: rgba(15,23,42,0.8);
   color: white;
   outline: none;
   font-size: 14px;
   transition: border-color 0.2s, box-shadow 0.2s;
 }
+.input::placeholder { color: #475569; }
+.input:focus { border-color: #38bdf8; box-shadow: 0 0 8px rgba(56,189,248,0.25); }
 
-.input::placeholder {
-  color: #475569;
-}
-
-.input:focus {
-  border-color: #38bdf8;
-  box-shadow: 0 0 8px rgba(56, 189, 248, 0.25);
+/* listening state — subtle blue glow on input */
+.input.listening {
+  border-color: rgba(239,68,68,0.5);
+  box-shadow: 0 0 10px rgba(239,68,68,0.2);
 }
 
 .button {
@@ -276,48 +220,85 @@
   white-space: nowrap;
   flex-shrink: 0;
 }
+.button:hover:not(:disabled) { transform: scale(1.04); opacity: 0.92; }
+.button:disabled { opacity: 0.45; cursor: not-allowed; transform: none; }
 
-.button:hover:not(:disabled) {
-  transform: scale(1.04);
-  opacity: 0.92;
-}
-
-.button:disabled {
-  opacity: 0.45;
-  cursor: not-allowed;
-  transform: none;
-}
-
-/* ===== SCROLLBAR ===== */
-.chatBox::-webkit-scrollbar { width: 6px; }
-.chatBox::-webkit-scrollbar-thumb {
-  background: rgba(255, 255, 255, 0.1);
-  border-radius: 10px;
-}
-.chatBox::-webkit-scrollbar-track { background: transparent; }
-
-/* ===== LOADING DOTS ===== */
-.dots {
-  display: flex;
-  gap: 5px;
-  align-items: center;
-  padding: 2px 0;
-}
-
-.dots span {
-  width: 6px;
-  height: 6px;
-  background: #38bdf8;
+/* ===== MIC BUTTON ===== */
+.micBtn {
+  width: 42px;
+  height: 42px;
   border-radius: 50%;
-  animation: blink 1.4s infinite;
+  border: none;
+  background: rgba(255,255,255,0.06);
+  color: #94a3b8;
+  font-size: 18px;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  transition: background 0.15s, color 0.15s, transform 0.15s;
+  position: relative;
+}
+.micBtn:hover:not(:disabled) {
+  background: rgba(56,189,248,0.12);
+  color: #38bdf8;
+  transform: scale(1.08);
+}
+.micBtn:disabled { opacity: 0.35; cursor: not-allowed; }
+
+/* Active / recording state */
+.micBtn.recording {
+  background: rgba(239,68,68,0.15);
+  color: #ef4444;
+  border: 1px solid rgba(239,68,68,0.3);
 }
 
-.dots span:nth-child(2) { animation-delay: 0.2s; }
-.dots span:nth-child(3) { animation-delay: 0.4s; }
+/* Pulsing ring when recording */
+.micBtn.recording::before {
+  content: "";
+  position: absolute;
+  inset: -4px;
+  border-radius: 50%;
+  border: 2px solid rgba(239,68,68,0.5);
+  animation: micPulse 1.2s ease-out infinite;
+}
+.micBtn.recording::after {
+  content: "";
+  position: absolute;
+  inset: -8px;
+  border-radius: 50%;
+  border: 2px solid rgba(239,68,68,0.25);
+  animation: micPulse 1.2s ease-out infinite 0.4s;
+}
 
-@keyframes blink {
-  0%, 80%, 100% { opacity: 0.2; }
-  40% { opacity: 1; }
+@keyframes micPulse {
+  0%   { transform: scale(1);   opacity: 1; }
+  100% { transform: scale(1.5); opacity: 0; }
+}
+
+/* ===== TTS TOGGLE BUTTON ===== */
+.ttsBtn {
+  width: 36px;
+  height: 36px;
+  border-radius: 8px;
+  border: 1px solid rgba(255,255,255,0.08);
+  background: rgba(255,255,255,0.04);
+  color: #64748b;
+  font-size: 16px;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  transition: background 0.15s, color 0.15s, border-color 0.15s;
+  title: "Toggle voice response";
+}
+.ttsBtn:hover { background: rgba(255,255,255,0.07); color: #94a3b8; }
+.ttsBtn.ttsOn {
+  background: rgba(52,211,153,0.1);
+  border-color: rgba(52,211,153,0.3);
+  color: #34d399;
 }
 
 /* ===== MODEL BADGE ===== */
@@ -333,18 +314,20 @@
   letter-spacing: 0.04em;
   text-transform: uppercase;
 }
+.modelBadge.chat { background: rgba(56,189,248,0.1); color: #38bdf8; border: 1px solid rgba(56,189,248,0.2); }
+.modelBadge.code { background: rgba(52,211,153,0.1); color: #34d399; border: 1px solid rgba(52,211,153,0.2); }
 
-.modelBadge.chat {
-  background: rgba(56, 189, 248, 0.1);
-  color: #38bdf8;
-  border: 1px solid rgba(56, 189, 248, 0.2);
+/* ===== LOADING DOTS ===== */
+.dots { display: flex; gap: 5px; align-items: center; padding: 2px 0; }
+.dots span {
+  width: 6px; height: 6px;
+  background: #38bdf8;
+  border-radius: 50%;
+  animation: blink 1.4s infinite;
 }
-
-.modelBadge.code {
-  background: rgba(52, 211, 153, 0.1);
-  color: #34d399;
-  border: 1px solid rgba(52, 211, 153, 0.2);
-}
+.dots span:nth-child(2) { animation-delay: 0.2s; }
+.dots span:nth-child(3) { animation-delay: 0.4s; }
+@keyframes blink { 0%,80%,100% { opacity: 0.2; } 40% { opacity: 1; } }
 
 /* ===== TYPING CURSOR ===== */
 .typingCursor {
@@ -357,8 +340,18 @@
   vertical-align: middle;
   animation: cursorBlink 0.6s step-end infinite;
 }
+@keyframes cursorBlink { 0%,100% { opacity: 1; } 50% { opacity: 0; } }
 
-@keyframes cursorBlink {
-  0%, 100% { opacity: 1; }
-  50% { opacity: 0; }
+/* ===== MODEL BADGE ===== */
+.modelBadge {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 10px;
+  font-weight: 600;
+  padding: 2px 7px;
+  border-radius: 6px;
+  margin-bottom: 5px;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
 }

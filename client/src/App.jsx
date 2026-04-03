@@ -8,28 +8,118 @@ import SourcesPanel from "./components/SourcesPanel";
 import CodeBlock from "./components/CodeBlock";
 import "./App.css";
 
-// ── Markdown components — uses CodeBlock for fenced code ─────────────────────
+// ─────────────────────────────────────────────────────────────────────────────
+// 🎤  useVoice — Speech Recognition + TTS hook
+// ─────────────────────────────────────────────────────────────────────────────
+function useVoice({ onTranscript, onAutoSend }) {
+  const [listening,  setListening]  = useState(false);
+  const [supported,  setSupported]  = useState(false);
+  const [ttsEnabled, setTtsEnabled] = useState(true);
+  const recognitionRef = useRef(null);
+
+  useEffect(() => {
+    const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
+    if (!SR) { setSupported(false); return; }
+
+    setSupported(true);
+    const rec = new SR();
+    rec.continuous     = false;   // stop after one utterance
+    rec.interimResults = true;    // show partial results while speaking
+    rec.lang           = "en-US";
+
+    rec.onresult = (e) => {
+      let interim = "";
+      let final   = "";
+      for (const result of e.results) {
+        if (result.isFinal) final   += result[0].transcript;
+        else                 interim += result[0].transcript;
+      }
+      // Show whatever we have so far in the input box
+      onTranscript(final || interim);
+      // Auto-send when we get a final result
+      if (final.trim()) onAutoSend(final.trim());
+    };
+
+    rec.onend  = () => setListening(false);
+    rec.onerror = (e) => {
+      console.warn("SpeechRecognition error:", e.error);
+      setListening(false);
+    };
+
+    recognitionRef.current = rec;
+  }, []); // eslint-disable-line
+
+  // Toggle mic on/off
+  const toggleMic = useCallback(() => {
+    const rec = recognitionRef.current;
+    if (!rec) return;
+    if (listening) {
+      rec.stop();
+      setListening(false);
+    } else {
+      try { rec.start(); setListening(true); }
+      catch { /* already started */ }
+    }
+  }, [listening]);
+
+  // Speak text aloud
+  const speak = useCallback((text) => {
+    if (!ttsEnabled) return;
+    if (!window.speechSynthesis) return;
+    // Cancel any ongoing speech first
+    window.speechSynthesis.cancel();
+    // Strip markdown symbols for cleaner speech
+    const clean = text
+      .replace(/```[\s\S]*?```/g, "code block")
+      .replace(/`([^`]+)`/g, "$1")
+      .replace(/\*\*(.+?)\*\*/g, "$1")
+      .replace(/\*(.+?)\*/g, "$1")
+      .replace(/#{1,6}\s/g, "")
+      .replace(/\[(.+?)\]\(.+?\)/g, "$1")
+      .slice(0, 600); // don't read huge responses in full
+    const utt = new SpeechSynthesisUtterance(clean);
+      const voices = window.speechSynthesis.getVoices();
+
+    const femaleVoice =
+    voices.find(v =>
+      v.name.toLowerCase().includes("female") ||
+      v.name.toLowerCase().includes("zira") ||     // Windows female
+      v.name.toLowerCase().includes("samantha") || // Mac female
+      v.name.toLowerCase().includes("google uk english female") ||
+      v.name.toLowerCase().includes("en-gb")
+    ) || voices[0];
+
+  utt.voice = femaleVoice;
+    utt.rate   = 1.05;
+    utt.pitch  = 1;
+    utt.volume = 1;
+    window.speechSynthesis.speak(utt);
+  }, [ttsEnabled]);
+
+  const stopSpeaking = useCallback(() => {
+    window.speechSynthesis?.cancel();
+  }, []);
+
+  return { listening, supported, ttsEnabled, setTtsEnabled, toggleMic, speak, stopSpeaking };
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Markdown renderer (left-aligned, uses CodeBlock)
+// ─────────────────────────────────────────────────────────────────────────────
 const ChatMarkdown = ({ content }) => (
   <ReactMarkdown
     remarkPlugins={[remarkGfm]}
     components={{
       code({ node, inline, className, children, ...props }) {
-        if (inline) {
-          return (
-            <code style={{
-              background: "rgba(30,41,59,0.9)",
-              border: "1px solid rgba(255,255,255,0.08)",
-              padding: "2px 6px",
-              borderRadius: "4px",
-              fontSize: "13px",
-              color: "#7dd3fc",
-              fontFamily: "Fira Code, Consolas, monospace",
-            }} {...props}>{children}</code>
-          );
-        }
+        if (inline) return (
+          <code style={{
+            background: "rgba(30,41,59,0.9)", border: "1px solid rgba(255,255,255,0.08)",
+            padding: "2px 6px", borderRadius: "4px", fontSize: "13px",
+            color: "#7dd3fc", fontFamily: "Fira Code, Consolas, monospace",
+          }} {...props}>{children}</code>
+        );
         return <CodeBlock className={className}>{children}</CodeBlock>;
       },
-      // Left-align all text elements
       p:          ({ children }) => <p style={{ margin: "0 0 10px", textAlign: "left" }}>{children}</p>,
       ul:         ({ children }) => <ul style={{ paddingLeft: "20px", margin: "0 0 10px", textAlign: "left" }}>{children}</ul>,
       ol:         ({ children }) => <ol style={{ paddingLeft: "20px", margin: "0 0 10px", textAlign: "left" }}>{children}</ol>,
@@ -40,14 +130,9 @@ const ChatMarkdown = ({ content }) => (
       strong:     ({ children }) => <strong style={{ color: "#f1f5f9", fontWeight: 600 }}>{children}</strong>,
       blockquote: ({ children }) => (
         <blockquote style={{
-          borderLeft: "3px solid #6366f1",
-          background: "rgba(99,102,241,0.08)",
-          padding: "10px 14px",
-          borderRadius: "0 8px 8px 0",
-          margin: "12px 0",
-          color: "#94a3b8",
-          fontStyle: "italic",
-          textAlign: "left",
+          borderLeft: "3px solid #6366f1", background: "rgba(99,102,241,0.08)",
+          padding: "10px 14px", borderRadius: "0 8px 8px 0", margin: "12px 0",
+          color: "#94a3b8", fontStyle: "italic", textAlign: "left",
         }}>{children}</blockquote>
       ),
       table: ({ children }) => (
@@ -67,59 +152,46 @@ const ChatMarkdown = ({ content }) => (
   </ReactMarkdown>
 );
 
-// ── Typing animation ──────────────────────────────────────────────────────────
+// ─────────────────────────────────────────────────────────────────────────────
+// Typing animation
+// ─────────────────────────────────────────────────────────────────────────────
 function TypingMessage({ text, onDone }) {
   const [displayed, setDisplayed] = useState("");
   const indexRef = useRef(0);
-
   useEffect(() => {
     // eslint-disable-next-line react-hooks/set-state-in-effect
-    setDisplayed("");
-    indexRef.current = 0;
-    const interval = setInterval(() => {
+    setDisplayed(""); indexRef.current = 0;
+    const iv = setInterval(() => {
       indexRef.current += 1;
       setDisplayed(text.slice(0, indexRef.current));
-      if (indexRef.current >= text.length) { clearInterval(interval); onDone?.(); }
+      if (indexRef.current >= text.length) { clearInterval(iv); onDone?.(); }
     }, 14);
-    return () => clearInterval(interval);
+    return () => clearInterval(iv);
   }, [text, onDone]);
-
   return (
-    <span style={{ textAlign: "left", display: "block" }}>
+    <span>
       {displayed}
       {displayed.length < text.length && <span className="typingCursor" />}
     </span>
   );
 }
 
-// ── User message with edit ────────────────────────────────────────────────────
+// ─────────────────────────────────────────────────────────────────────────────
+// User message (with inline edit)
+// ─────────────────────────────────────────────────────────────────────────────
 function UserMessage({ content, onResend }) {
-  const [editing, setEditing]   = useState(false);
-  const [editVal, setEditVal]   = useState(content);
-
-  const handleSave = () => {
-    if (editVal.trim()) { onResend(editVal.trim()); }
-    setEditing(false);
-  };
-
-  if (editing) {
-    return (
-      <div className="userMsgWrapper">
-        <textarea
-          className="userEditTextarea"
-          value={editVal}
-          onChange={(e) => setEditVal(e.target.value)}
-          rows={3}
-          autoFocus
-        />
-        <div className="userEditActions">
-          <button className="userEditCancel" onClick={() => setEditing(false)}>Cancel</button>
-          <button className="userEditSave"   onClick={handleSave}>✓ Resend</button>
-        </div>
+  const [editing, setEditing] = useState(false);
+  const [editVal, setEditVal] = useState(content);
+  if (editing) return (
+    <div className="userMsgWrapper">
+      <textarea className="userEditTextarea" value={editVal}
+        onChange={(e) => setEditVal(e.target.value)} rows={3} autoFocus />
+      <div className="userEditActions">
+        <button className="userEditCancel" onClick={() => setEditing(false)}>Cancel</button>
+        <button className="userEditSave" onClick={() => { if (editVal.trim()) onResend(editVal.trim()); setEditing(false); }}>✓ Resend</button>
       </div>
-    );
-  }
-
+    </div>
+  );
   return (
     <div className="userMsgWrapper">
       <div className="userMsg">{content}</div>
@@ -130,7 +202,9 @@ function UserMessage({ content, onResend }) {
   );
 }
 
-// ── App ───────────────────────────────────────────────────────────────────────
+// ─────────────────────────────────────────────────────────────────────────────
+// App
+// ─────────────────────────────────────────────────────────────────────────────
 function App() {
   const [tab, setTab]                             = useState("chat");
   const [message, setMessage]                     = useState("");
@@ -148,21 +222,29 @@ function App() {
   const bottomRef        = useRef(null);
   const handleTypingDone = useCallback(() => setTypingId(null), []);
 
+  // ── Voice hook ──────────────────────────────────────────────────────────────
+  const voice = useVoice({
+    // When speech is recognised, fill the input box
+    onTranscript: (t) => setMessage(t),
+    // When a final transcript arrives, auto-send it
+    onAutoSend:   (t) => doSend(t),
+  });
+
   useEffect(() => {
-    getChats().then((res) => setConversations(res.data));
+    getChats().then((r) => setConversations(r.data));
   }, []);
 
   useEffect(() => {
     bottomRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [displayedMessages, loading]);
 
+  // ── Select conversation ────────────────────────────────────────────────────
   const handleSelectChat = async (conv) => {
     try {
       const res  = await getConversation(conv._id);
       const full = res.data;
-      const msgs = full.messages.map((m, i) => ({ ...m, _displayId: `${full._id}_${i}` }));
       setConversationId(full._id);
-      setDisplayedMessages(msgs);
+      setDisplayedMessages(full.messages.map((m, i) => ({ ...m, _displayId: `${full._id}_${i}` })));
       setTypingId(null);
       setMsgMeta({});
       setTab("chat");
@@ -175,55 +257,51 @@ function App() {
     setMessage("");
     setTypingId(null);
     setMsgMeta({});
+    voice.stopSpeaking();
   };
 
-  // Core send — accepts optional override text (for edit+resend)
-  const doSend = async (text, convId = conversationId) => {
-    if (!text.trim()) return;
+  // ── Core send (accepts text override for voice) ────────────────────────────
+  const doSend = useCallback(async (text, convId = null) => {
+    const resolvedConvId = convId ?? conversationId;
+    if (!text?.trim() || loading) return;
+
+    // Stop any ongoing speech before sending
+    voice.stopSpeaking();
     setLoading(true);
+    setMessage("");
 
-    // eslint-disable-next-line react-hooks/purity
     const userDisplayId = `user_${Date.now()}`;
-    // eslint-disable-next-line react-hooks/purity
     const aiDisplayId   = `ai_${Date.now() + 1}`;
-    const userMsg = { role: "user", content: text, _displayId: userDisplayId };
-
-    setDisplayedMessages((prev) => [...prev, userMsg]);
+    setDisplayedMessages((prev) => [...prev, { role: "user", content: text, _displayId: userDisplayId }]);
 
     try {
-      const res = await sendMessage(text, convId);
+      const res = await sendMessage(text, resolvedConvId);
       const { conversationId: newConvId, aiMessage, searchResults, images, searchQuery, modelUsed } = res.data;
 
       setConversationId(newConvId);
-      const aiMsg = { role: "ai", content: aiMessage, _displayId: aiDisplayId };
-      setDisplayedMessages((prev) => [...prev, aiMsg]);
+      setDisplayedMessages((prev) => [...prev, { role: "ai", content: aiMessage, _displayId: aiDisplayId }]);
       setTypingId(aiDisplayId);
 
       setMsgMeta((prev) => ({
         ...prev,
-        [aiDisplayId]: {
-          searchResults: searchResults || [],
-          images:        images        || [],
-          searchQuery,
-          modelUsed,
-        },
+        [aiDisplayId]: { searchResults: searchResults || [], images: images || [], searchQuery, modelUsed },
       }));
+
+      // 🔊 Speak the AI response when typing animation finishes
+      // We delay slightly so the typing animation has started
+      setTimeout(() => voice.speak(aiMessage), 400);
 
       const listRes = await getChats();
       setConversations(listRes.data);
     } catch (err) { console.error(err); }
 
     setLoading(false);
-  };
+  }, [conversationId, loading, voice]);
 
   const handleSend = () => {
-    if (!message.trim()) return;
-    const text = message;
-    setMessage("");
-    doSend(text);
+    if (message.trim()) doSend(message.trim());
   };
 
-  // Edit+resend: remove messages from that pair onward, resend
   const handleResend = (pairIndex, newText) => {
     setDisplayedMessages((prev) => prev.slice(0, pairIndex));
     doSend(newText);
@@ -233,12 +311,11 @@ function App() {
     if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); handleSend(); }
   };
 
+  // ── Notes ──────────────────────────────────────────────────────────────────
   const handleNotesSaved = (prompt, notes) => {
     const entry = {
       prompt, notes,
-      timestamp: new Date().toLocaleString("en-IN", {
-        day: "2-digit", month: "short", hour: "2-digit", minute: "2-digit",
-      }),
+      timestamp: new Date().toLocaleString("en-IN", { day: "2-digit", month: "short", hour: "2-digit", minute: "2-digit" }),
     };
     setNotesHistory((prev) => [entry, ...prev]);
     setActiveNotesIndex(0);
@@ -251,12 +328,13 @@ function App() {
     setTab("notes");
   };
 
-  // Pair messages
+  // Pair messages for display
   const messagePairs = [];
   for (let i = 0; i < displayedMessages.length; i += 2) {
     messagePairs.push({ userM: displayedMessages[i], aiM: displayedMessages[i + 1], pairStart: i });
   }
 
+  // ─────────────────────────────────────────────────────────────────────────
   return (
     <div className="app">
       <Sidebar
@@ -274,7 +352,8 @@ function App() {
       />
 
       <div className="main">
-        {/* Sticky topbar */}
+
+        {/* ── Sticky topbar ── */}
         <div className="topbar">
           <button className="menuBtn" onClick={() => setSidebarOpen(true)}>☰</button>
           <h2>OLLAMA AI</h2>
@@ -284,31 +363,26 @@ function App() {
           </div>
         </div>
 
-        {/* ── Chat ── */}
+        {/* ── Chat tab ── */}
         {tab === "chat" && (
           <>
             <div className="chatBox">
               {displayedMessages.length === 0 && !loading && (
                 <div style={{ margin: "auto", textAlign: "center", color: "#475569", fontSize: "14px" }}>
                   <div style={{ fontSize: "40px", marginBottom: "12px" }}>✨</div>
-                  Ask me anything to get started.
+                  Ask me anything — or tap the mic to speak.
                 </div>
               )}
 
               {messagePairs.map(({ userM, aiM, pairStart }) => (
                 <div key={userM?._displayId || pairStart} className="messageBlock">
 
-                  {/* User message with edit */}
                   {userM && (
                     <div className="userRow">
-                      <UserMessage
-                        content={userM.content}
-                        onResend={(newText) => handleResend(pairStart, newText)}
-                      />
+                      <UserMessage content={userM.content} onResend={(t) => handleResend(pairStart, t)} />
                     </div>
                   )}
 
-                  {/* AI message with markdown + code blocks */}
                   {aiM && (
                     <>
                       <div className="aiRow">
@@ -319,16 +393,14 @@ function App() {
                             </span>
                           )}
                           <div className="aiMsg" style={{ maxWidth: "100%" }}>
-                            {aiM._displayId === typingId ? (
-                              <TypingMessage text={aiM.content} onDone={handleTypingDone} />
-                            ) : (
-                              <ChatMarkdown content={aiM.content} />
-                            )}
+                            {aiM._displayId === typingId
+                              ? <TypingMessage text={aiM.content} onDone={handleTypingDone} />
+                              : <ChatMarkdown content={aiM.content} />}
                           </div>
                         </div>
                       </div>
 
-                      {msgMeta[aiM._displayId]?.searchResults?.length > 0 || msgMeta[aiM._displayId]?.images?.length > 0 ? (
+                      {(msgMeta[aiM._displayId]?.searchResults?.length > 0 || msgMeta[aiM._displayId]?.images?.length > 0) && (
                         <div className="aiRow">
                           <div style={{ maxWidth: "75%", width: "100%" }}>
                             <SourcesPanel
@@ -338,7 +410,7 @@ function App() {
                             />
                           </div>
                         </div>
-                      ) : null}
+                      )}
                     </>
                   )}
                 </div>
@@ -354,20 +426,53 @@ function App() {
               <div ref={bottomRef} />
             </div>
 
+            {/* ── Input bar with mic + TTS ── */}
             <div className="inputArea">
+
+              {/* TTS toggle — only show if speechSynthesis is available */}
+              {typeof window !== "undefined" && window.speechSynthesis && (
+                <button
+                  className={`ttsBtn ${voice.ttsEnabled ? "ttsOn" : ""}`}
+                  onClick={() => {
+                    voice.stopSpeaking();
+                    voice.setTtsEnabled((p) => !p);
+                  }}
+                  title={voice.ttsEnabled ? "Voice response ON — click to mute" : "Voice response OFF — click to enable"}
+                >
+                  {voice.ttsEnabled ? "🔊" : "🔇"}
+                </button>
+              )}
+
+              {/* Text input */}
               <input
-                className="input"
+                className={`input ${voice.listening ? "listening" : ""}`}
                 value={message}
                 onChange={(e) => setMessage(e.target.value)}
                 onKeyDown={handleKeyDown}
-                placeholder="Ask something..."
+                placeholder={voice.listening ? "Listening…" : "Ask something or tap 🎤"}
               />
-              <button className="button" onClick={handleSend} disabled={loading}>Send</button>
+
+              {/* Mic button — only shown when browser supports it */}
+              {voice.supported && (
+                <button
+                  className={`micBtn ${voice.listening ? "recording" : ""}`}
+                  onClick={voice.toggleMic}
+                  disabled={loading}
+                  title={voice.listening ? "Stop recording" : "Start voice input"}
+                >
+                  🎤
+                </button>
+              )}
+
+              {/* Send button */}
+              <button className="button" onClick={handleSend} disabled={loading || voice.listening}>
+                Send
+              </button>
             </div>
           </>
         )}
 
-        {/* ── Notes ── */}
+        {/* ── Notes tab ── */}
         {tab === "notes" && (
           <Notes onNotesSaved={handleNotesSaved} preloadedNote={loadedNote} />
         )}
