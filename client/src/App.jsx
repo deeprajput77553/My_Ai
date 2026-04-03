@@ -3,6 +3,7 @@ import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
 import { sendMessage, getChats, getConversation } from "./api";
 import { useAuth } from "./contexts/AuthContext";
+import { useSettings } from "./contexts/SettingsContext";
 import AuthPage from "./components/AuthPage";
 import Sidebar from "./components/Sidebar";
 import Notes from "./components/Notes";
@@ -10,6 +11,9 @@ import SourcesPanel from "./components/SourcesPanel";
 import CodeBlock from "./components/CodeBlock";
 import WeatherWidget from "./components/WeatherWidget";
 import NewsWidget from "./components/NewsWidget";
+import RemindersPanel from "./components/RemindersPanel";
+import UserDataPanel from "./components/UserDataPanel";
+import SettingsPanel from "./components/SettingsPanel";
 import "./App.css";
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -23,7 +27,6 @@ function useVoice({ onTranscript, onAutoSend }) {
   const onTranscriptRef = useRef(onTranscript);
   const onAutoSendRef = useRef(onAutoSend);
 
-  // Keep refs updated
   useEffect(() => {
     onTranscriptRef.current = onTranscript;
     onAutoSendRef.current = onAutoSend;
@@ -32,64 +35,36 @@ function useVoice({ onTranscript, onAutoSend }) {
   useEffect(() => {
     const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
     if (!SR) { setSupported(false); return; }
-
     setSupported(true);
     const rec = new SR();
-    rec.continuous     = false;   // stop after one utterance
-    rec.interimResults = true;    // show partial results while speaking
+    rec.continuous     = false;
+    rec.interimResults = true;
     rec.lang           = "en-US";
-
     rec.onresult = (e) => {
-      let interim = "";
-      let final   = "";
+      let interim = ""; let final = "";
       for (const result of e.results) {
         if (result.isFinal) final   += result[0].transcript;
         else                 interim += result[0].transcript;
       }
-      // Show whatever we have so far in the input box
-      if (onTranscriptRef.current) {
-        onTranscriptRef.current(final || interim);
-      }
-      // Auto-send when we get a final result
-      if (final.trim() && onAutoSendRef.current) {
-        onAutoSendRef.current(final.trim());
-      }
+      if (onTranscriptRef.current) onTranscriptRef.current(final || interim);
+      if (final.trim() && onAutoSendRef.current) onAutoSendRef.current(final.trim());
     };
-
     rec.onend  = () => setListening(false);
-    rec.onerror = (e) => {
-      console.warn("SpeechRecognition error:", e.error);
-      setListening(false);
-    };
-
+    rec.onerror = (e) => { console.warn("SpeechRecognition error:", e.error); setListening(false); };
     recognitionRef.current = rec;
   }, []); // eslint-disable-line
 
-  // Toggle mic on/off
   const toggleMic = useCallback(() => {
     const rec = recognitionRef.current;
     if (!rec) return;
-    if (listening) {
-      rec.stop();
-      setListening(false);
-    } else {
-      try { 
-        rec.start(); 
-        setListening(true); 
-      }
-      catch (err) { 
-        console.warn("Mic start error:", err);
-      }
-    }
+    if (listening) { rec.stop(); setListening(false); }
+    else { try { rec.start(); setListening(true); } catch (err) { console.warn("Mic start error:", err); } }
   }, [listening]);
 
-  // Speak text aloud
   const speak = useCallback((text) => {
     if (!ttsEnabled) return;
     if (!window.speechSynthesis) return;
-    // Cancel any ongoing speech first
     window.speechSynthesis.cancel();
-    // Strip markdown symbols for cleaner speech
     const clean = text
       .replace(/```[\s\S]*?```/g, "code block")
       .replace(/`([^`]+)`/g, "$1")
@@ -97,35 +72,26 @@ function useVoice({ onTranscript, onAutoSend }) {
       .replace(/\*(.+?)\*/g, "$1")
       .replace(/#{1,6}\s/g, "")
       .replace(/\[(.+?)\]\(.+?\)/g, "$1")
-      .slice(0, 600); // don't read huge responses in full
+      .slice(0, 600);
     const utt = new SpeechSynthesisUtterance(clean);
-      const voices = window.speechSynthesis.getVoices();
-
-    const femaleVoice =
-    voices.find(v =>
-      v.name.toLowerCase().includes("female") ||
-      v.name.toLowerCase().includes("zira") ||     // Windows female
-      v.name.toLowerCase().includes("samantha") || // Mac female
-      v.name.toLowerCase().includes("google uk english female") ||
+    const voices = window.speechSynthesis.getVoices();
+    const femaleVoice = voices.find(v =>
+      v.name.toLowerCase().includes("female") || v.name.toLowerCase().includes("zira") ||
+      v.name.toLowerCase().includes("samantha") || v.name.toLowerCase().includes("google uk english female") ||
       v.name.toLowerCase().includes("en-gb")
     ) || voices[0];
-
-  utt.voice = femaleVoice;
-    utt.rate   = 1.05;
-    utt.pitch  = 1;
-    utt.volume = 1;
+    utt.voice = femaleVoice;
+    utt.rate = 1.05; utt.pitch = 1; utt.volume = 1;
     window.speechSynthesis.speak(utt);
   }, [ttsEnabled]);
 
-  const stopSpeaking = useCallback(() => {
-    window.speechSynthesis?.cancel();
-  }, []);
+  const stopSpeaking = useCallback(() => { window.speechSynthesis?.cancel(); }, []);
 
   return { listening, supported, ttsEnabled, setTtsEnabled, toggleMic, speak, stopSpeaking };
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
-// Markdown renderer (left-aligned, uses CodeBlock)
+// Markdown renderer
 // ─────────────────────────────────────────────────────────────────────────────
 const ChatMarkdown = ({ content }) => (
   <ReactMarkdown
@@ -180,7 +146,6 @@ function TypingMessage({ text, onDone }) {
   const [displayed, setDisplayed] = useState("");
   const indexRef = useRef(0);
   useEffect(() => {
-    // eslint-disable-next-line react-hooks/set-state-in-effect
     setDisplayed(""); indexRef.current = 0;
     const iv = setInterval(() => {
       indexRef.current += 1;
@@ -227,9 +192,10 @@ function UserMessage({ content, onResend }) {
 // App
 // ─────────────────────────────────────────────────────────────────────────────
 function App() {
-  const { isAuthenticated, loading: authLoading, user, logout } = useAuth();
+  const { isAuthenticated, loading: authLoading, user } = useAuth();
+  const { settings } = useSettings();
   
-  const [tab, setTab]                             = useState("chat");
+  const [activeTab, setActiveTab]                 = useState("chat");
   const [message, setMessage]                     = useState("");
   const [conversations, setConversations]         = useState([]);
   const [conversationId, setConversationId]       = useState(null);
@@ -245,11 +211,8 @@ function App() {
   const bottomRef        = useRef(null);
   const handleTypingDone = useCallback(() => setTypingId(null), []);
 
-  // ── Voice hook ──────────────────────────────────────────────────────────────
   const voice = useVoice({
-    // When speech is recognised, fill the input box
     onTranscript: (t) => setMessage(t),
-    // When a final transcript arrives, auto-send it
     onAutoSend:   (t) => doSend(t),
   });
 
@@ -263,7 +226,11 @@ function App() {
     bottomRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [displayedMessages, loading]);
 
-  // ── Select conversation ────────────────────────────────────────────────────
+  // Auto-open sidebar on large screens
+  useEffect(() => {
+    if (window.innerWidth > 1100) setSidebarOpen(true);
+  }, []);
+
   const handleSelectChat = async (conv) => {
     try {
       const res  = await getConversation(conv._id);
@@ -272,7 +239,7 @@ function App() {
       setDisplayedMessages(full.messages.map((m, i) => ({ ...m, _displayId: `${full._id}_${i}` })));
       setTypingId(null);
       setMsgMeta({});
-      setTab("chat");
+      setActiveTab("chat");
     } catch (err) { console.error(err); }
   };
 
@@ -285,28 +252,21 @@ function App() {
     voice.stopSpeaking();
   };
 
-  // ── Core send (accepts text override for voice) ────────────────────────────
   const doSend = useCallback(async (text, convId = null) => {
     const resolvedConvId = convId ?? conversationId;
     if (!text?.trim() || loading) return;
-
-    // Stop any ongoing speech before sending
     voice.stopSpeaking();
     setLoading(true);
     setMessage("");
-
     const userDisplayId = `user_${Date.now()}`;
     const aiDisplayId   = `ai_${Date.now() + 1}`;
     setDisplayedMessages((prev) => [...prev, { role: "user", content: text, _displayId: userDisplayId }]);
-
     try {
       const res = await sendMessage(text, resolvedConvId);
       const { conversationId: newConvId, aiMessage, searchResults, images, searchQuery, modelUsed, weather, news } = res.data;
-
       setConversationId(newConvId);
       setDisplayedMessages((prev) => [...prev, { role: "ai", content: aiMessage, _displayId: aiDisplayId }]);
       setTypingId(aiDisplayId);
-
       setMsgMeta((prev) => ({
         ...prev,
         [aiDisplayId]: { 
@@ -318,21 +278,14 @@ function App() {
           news: news || []
         },
       }));
-
-      // 🔊 Speak the AI response when typing animation finishes
-      // We delay slightly so the typing animation has started
       setTimeout(() => voice.speak(aiMessage), 400);
-
       const listRes = await getChats();
       setConversations(listRes.data);
     } catch (err) { console.error(err); }
-
     setLoading(false);
   }, [conversationId, loading, voice]);
 
-  const handleSend = () => {
-    if (message.trim()) doSend(message.trim());
-  };
+  const handleSend = () => { if (message.trim()) doSend(message.trim()); };
 
   const handleResend = (pairIndex, newText) => {
     setDisplayedMessages((prev) => prev.slice(0, pairIndex));
@@ -343,7 +296,6 @@ function App() {
     if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); handleSend(); }
   };
 
-  // ── Notes ──────────────────────────────────────────────────────────────────
   const handleNotesSaved = (prompt, notes) => {
     const entry = {
       prompt, notes,
@@ -357,23 +309,19 @@ function App() {
     if (index === null) { setActiveNotesIndex(null); setLoadedNote(null); return; }
     setActiveNotesIndex(index);
     setLoadedNote(notesHistory[index]);
-    setTab("notes");
+    setActiveTab("notes");
   };
 
-  // Pair messages for display
   const messagePairs = [];
   for (let i = 0; i < displayedMessages.length; i += 2) {
     messagePairs.push({ userM: displayedMessages[i], aiM: displayedMessages[i + 1], pairStart: i });
   }
 
-  // Show loading screen while checking authentication
   if (authLoading) {
     return (
       <div style={{
-        display: "flex",
-        flexDirection: "column",
-        justifyContent: "center",
-        alignItems: "center",
+        display: "flex", flexDirection: "column",
+        justifyContent: "center", alignItems: "center",
         height: "100vh",
         background: "linear-gradient(135deg, #0b0f1a, #020617)",
         gap: "16px"
@@ -383,21 +331,16 @@ function App() {
           <span style={{ background: "#38bdf8" }}></span>
           <span style={{ background: "#38bdf8" }}></span>
         </div>
-        <div style={{ fontSize: "16px", color: "#94a3b8", fontWeight: 500 }}>
-          Loading...
-        </div>
+        <div style={{ fontSize: "16px", color: "#94a3b8", fontWeight: 500 }}>Loading...</div>
       </div>
     );
   }
 
-  // Show auth page if not authenticated
-  if (!isAuthenticated) {
-    return <AuthPage />;
-  }
+  if (!isAuthenticated) return <AuthPage />;
 
   // ─────────────────────────────────────────────────────────────────────────
   return (
-    <div className="app">
+    <div className={`app ${settings.compactMode ? "compact" : ""} ${settings.animations ? "" : "no-animations"}`}>
       <Sidebar
         conversations={conversations}
         setConversations={setConversations}
@@ -410,167 +353,168 @@ function App() {
         activeNotesIndex={activeNotesIndex}
         open={sidebarOpen}
         setOpen={setSidebarOpen}
+        activeTab={activeTab}
+        onTabChange={(tab) => {
+          setActiveTab(tab);
+          if (tab !== "notes") setLoadedNote(null);
+        }}
       />
 
       <div className="main">
 
         {/* ── Sticky topbar ── */}
         <div className="topbar">
-          <button className="menuBtn" onClick={() => setSidebarOpen(true)}>☰</button>
-          <h2>OLLAMA AI</h2>
-          <div className="tabs">
-            <button className={`tabBtn ${tab === "chat"  ? "activeTab" : ""}`} onClick={() => { setTab("chat");  setLoadedNote(null); }}>💬 Chat</button>
-            <button className={`tabBtn ${tab === "notes" ? "activeTab" : ""}`} onClick={() => setTab("notes")}>📝 Notes</button>
-          </div>
-          <div style={{ marginLeft: "auto", display: "flex", alignItems: "center", gap: "12px" }}>
-            <span style={{ fontSize: "14px", color: "#94a3b8" }}>👤 {user?.name}</span>
-            <button 
-              onClick={logout}
-              style={{
-                padding: "6px 12px",
-                background: "rgba(239, 68, 68, 0.1)",
-                color: "#ef4444",
-                border: "1px solid rgba(239, 68, 68, 0.3)",
-                borderRadius: "6px",
-                cursor: "pointer",
-                fontSize: "13px",
-                fontWeight: 500,
-              }}
-            >
-              Logout
-            </button>
+          <button className="menuBtn" onClick={() => setSidebarOpen(o => !o)}>☰</button>
+          <h2 className="topbar-title">
+            {activeTab === "chat"      && "Chat"}
+            {activeTab === "notes"     && "Notes"}
+            {activeTab === "reminders" && "Reminders"}
+            {activeTab === "userdata"  && "My Data"}
+            {activeTab === "settings"  && "Settings"}
+          </h2>
+          <div className="topbar-right">
+            <span className="topbar-user">👤 {user?.name}</span>
           </div>
         </div>
 
-        {/* ── Chat tab ── */}
-        {tab === "chat" && (
-          <>
-            <div className="chatBox">
-              {displayedMessages.length === 0 && !loading && (
-                <div style={{ margin: "auto", textAlign: "center", color: "#475569", fontSize: "14px" }}>
-                  <div style={{ fontSize: "40px", marginBottom: "12px" }}>✨</div>
-                  Ask me anything — or tap the mic to speak.
-                </div>
-              )}
-
-              {messagePairs.map(({ userM, aiM, pairStart }) => (
-                <div key={userM?._displayId || pairStart} className="messageBlock">
-
-                  {userM && (
-                    <div className="userRow">
-                      <UserMessage content={userM.content} onResend={(t) => handleResend(pairStart, t)} />
+        {/* ── Tab content ── */}
+        <div className="tab-content">
+          {/* Chat */}
+          {activeTab === "chat" && (
+            <>
+              <div className="chatBox">
+                {displayedMessages.length === 0 && !loading && (
+                  <div className="chat-empty">
+                    <div className="chat-empty-icon">✨</div>
+                    <div className="chat-empty-title">How can I help you today?</div>
+                    <div className="chat-empty-sub">Ask me anything, or tap the mic to speak.</div>
+                    <div className="chat-suggestions">
+                      {["What's the weather today?", "Latest news headlines", "Explain quantum physics", "Write a Python script"].map(s => (
+                        <button key={s} className="chat-suggestion-pill" onClick={() => doSend(s)}>
+                          {s}
+                        </button>
+                      ))}
                     </div>
-                  )}
-
-                  {aiM && (
-                    <>
-                      <div className="aiRow">
-                        <div style={{ display: "flex", flexDirection: "column", maxWidth: "75%", minWidth: 0 }}>
-                          {msgMeta[aiM._displayId]?.modelUsed && (
-                            <span className={`modelBadge ${msgMeta[aiM._displayId].modelUsed}`}>
-                              {msgMeta[aiM._displayId].modelUsed === "code" ? "⚡ CodeLlama" : "💬 Llama3"}
-                            </span>
-                          )}
-                          <div className="aiMsg" style={{ maxWidth: "100%" }}>
-                            {aiM._displayId === typingId
-                              ? <TypingMessage text={aiM.content} onDone={handleTypingDone} />
-                              : <ChatMarkdown content={aiM.content} />}
-                          </div>
-                        </div>
-                      </div>
-
-                      {(msgMeta[aiM._displayId]?.searchResults?.length > 0 || msgMeta[aiM._displayId]?.images?.length > 0) && (
-                        <div className="aiRow">
-                          <div style={{ maxWidth: "75%", width: "100%" }}>
-                            <SourcesPanel
-                              searchResults={msgMeta[aiM._displayId].searchResults}
-                              images={msgMeta[aiM._displayId].images}
-                              searchQuery={msgMeta[aiM._displayId].searchQuery}
-                            />
-                          </div>
-                        </div>
-                      )}
-
-                      {msgMeta[aiM._displayId]?.weather && (
-                        <div className="aiRow">
-                          <div style={{ maxWidth: "75%", width: "100%" }}>
-                            <WeatherWidget weatherData={msgMeta[aiM._displayId].weather} />
-                          </div>
-                        </div>
-                      )}
-
-                      {msgMeta[aiM._displayId]?.news && msgMeta[aiM._displayId].news.length > 0 && (
-                        <div className="aiRow">
-                          <div style={{ maxWidth: "75%", width: "100%" }}>
-                            <NewsWidget newsData={msgMeta[aiM._displayId].news} />
-                          </div>
-                        </div>
-                      )}
-                    </>
-                  )}
-                </div>
-              ))}
-
-              {loading && (
-                <div className="aiRow">
-                  <div className="aiMsg">
-                    <div className="dots"><span/><span/><span/></div>
                   </div>
-                </div>
-              )}
-              <div ref={bottomRef} />
-            </div>
+                )}
 
-            {/* ── Input bar with mic + TTS ── */}
-            <div className="inputArea">
+                {messagePairs.map(({ userM, aiM, pairStart }) => (
+                  <div key={userM?._displayId || pairStart} className="messageBlock">
+                    {userM && (
+                      <div className="userRow">
+                        <UserMessage content={userM.content} onResend={(t) => handleResend(pairStart, t)} />
+                      </div>
+                    )}
+                    {aiM && (
+                      <>
+                        <div className="aiRow">
+                          <div style={{ display: "flex", flexDirection: "column", maxWidth: "75%", minWidth: 0 }}>
+                            {msgMeta[aiM._displayId]?.modelUsed && (
+                              <span className={`modelBadge ${msgMeta[aiM._displayId].modelUsed}`}>
+                                {msgMeta[aiM._displayId].modelUsed === "code" ? "⚡ CodeLlama" : "💬 Llama3"}
+                              </span>
+                            )}
+                            <div className="aiMsg" style={{ maxWidth: "100%" }}>
+                              {aiM._displayId === typingId
+                                ? <TypingMessage text={aiM.content} onDone={handleTypingDone} />
+                                : <ChatMarkdown content={aiM.content} />}
+                            </div>
+                          </div>
+                        </div>
 
-              {/* TTS toggle — only show if speechSynthesis is available */}
-              {typeof window !== "undefined" && window.speechSynthesis && (
-                <button
-                  className={`ttsBtn ${voice.ttsEnabled ? "ttsOn" : ""}`}
-                  onClick={() => {
-                    voice.stopSpeaking();
-                    voice.setTtsEnabled((p) => !p);
-                  }}
-                  title={voice.ttsEnabled ? "Voice response ON — click to mute" : "Voice response OFF — click to enable"}
-                >
-                  {voice.ttsEnabled ? "🔊" : "🔇"}
+                        {(msgMeta[aiM._displayId]?.searchResults?.length > 0 || msgMeta[aiM._displayId]?.images?.length > 0) && (
+                          <div className="aiRow">
+                            <div style={{ maxWidth: "75%", width: "100%" }}>
+                              <SourcesPanel
+                                searchResults={msgMeta[aiM._displayId].searchResults}
+                                images={msgMeta[aiM._displayId].images}
+                                searchQuery={msgMeta[aiM._displayId].searchQuery}
+                              />
+                            </div>
+                          </div>
+                        )}
+
+                        {/* ── Dedicated Live Data Section ── */}
+                        {(msgMeta[aiM._displayId]?.weather || (msgMeta[aiM._displayId]?.news?.length > 0)) && (
+                          <div className="chat-live-section">
+                            <div className="chat-live-bar">
+                              <span className="chat-live-dot" />
+                              <span className="chat-live-label">
+                                {msgMeta[aiM._displayId]?.weather && msgMeta[aiM._displayId]?.news?.length > 0
+                                  ? "Weather & News"
+                                  : msgMeta[aiM._displayId]?.weather ? "Live Weather" : "Latest News"}
+                              </span>
+                            </div>
+                            {msgMeta[aiM._displayId]?.weather && (
+                              <WeatherWidget weatherData={msgMeta[aiM._displayId].weather} />
+                            )}
+                            {msgMeta[aiM._displayId]?.news?.length > 0 && (
+                              <NewsWidget newsData={msgMeta[aiM._displayId].news} />
+                            )}
+                          </div>
+                        )}
+                      </>
+                    )}
+                  </div>
+                ))}
+
+                {loading && (
+                  <div className="aiRow">
+                    <div className="aiMsg">
+                      <div className="dots"><span/><span/><span/></div>
+                    </div>
+                  </div>
+                )}
+                <div ref={bottomRef} />
+              </div>
+
+              {/* Input bar */}
+              <div className="inputArea">
+                {typeof window !== "undefined" && window.speechSynthesis && (
+                  <button
+                    className={`ttsBtn ${voice.ttsEnabled ? "ttsOn" : ""}`}
+                    onClick={() => { voice.stopSpeaking(); voice.setTtsEnabled((p) => !p); }}
+                    title={voice.ttsEnabled ? "Voice response ON" : "Voice response OFF"}
+                  >
+                    {voice.ttsEnabled ? "🔊" : "🔇"}
+                  </button>
+                )}
+                <input
+                  className={`input ${voice.listening ? "listening" : ""}`}
+                  value={message}
+                  onChange={(e) => setMessage(e.target.value)}
+                  onKeyDown={handleKeyDown}
+                  placeholder={voice.listening ? "Listening…" : "Ask something or tap 🎤"}
+                />
+                {voice.supported && (
+                  <button
+                    className={`micBtn ${voice.listening ? "recording" : ""}`}
+                    onClick={voice.toggleMic}
+                    disabled={loading}
+                    title={voice.listening ? "Stop recording" : "Start voice input"}
+                  >🎤</button>
+                )}
+                <button className="button" onClick={handleSend} disabled={loading || voice.listening}>
+                  Send
                 </button>
-              )}
+              </div>
+            </>
+          )}
 
-              {/* Text input */}
-              <input
-                className={`input ${voice.listening ? "listening" : ""}`}
-                value={message}
-                onChange={(e) => setMessage(e.target.value)}
-                onKeyDown={handleKeyDown}
-                placeholder={voice.listening ? "Listening…" : "Ask something or tap 🎤"}
-              />
+          {/* Notes */}
+          {activeTab === "notes" && (
+            <Notes onNotesSaved={handleNotesSaved} preloadedNote={loadedNote} />
+          )}
 
-              {/* Mic button — only shown when browser supports it */}
-              {voice.supported && (
-                <button
-                  className={`micBtn ${voice.listening ? "recording" : ""}`}
-                  onClick={voice.toggleMic}
-                  disabled={loading}
-                  title={voice.listening ? "Stop recording" : "Start voice input"}
-                >
-                  🎤
-                </button>
-              )}
+          {/* Reminders */}
+          {activeTab === "reminders" && <RemindersPanel />}
 
-              {/* Send button */}
-              <button className="button" onClick={handleSend} disabled={loading || voice.listening}>
-                Send
-              </button>
-            </div>
-          </>
-        )}
+          {/* User Data */}
+          {activeTab === "userdata" && <UserDataPanel />}
 
-        {/* ── Notes tab ── */}
-        {tab === "notes" && (
-          <Notes onNotesSaved={handleNotesSaved} preloadedNote={loadedNote} />
-        )}
+          {/* Settings */}
+          {activeTab === "settings" && <SettingsPanel />}
+        </div>
       </div>
     </div>
   );

@@ -1,12 +1,21 @@
 import { deleteChat } from "../api";
 import "./Sidebar.css";
 
+const NAV_ITEMS = [
+  { id: "chat",      icon: "\u2022", symbol: "Chat" },
+  { id: "notes",     icon: "\u2022", symbol: "Notes" },
+  { id: "reminders", icon: "\u2022", symbol: "Reminders" },
+  { id: "userdata",  icon: "\u2022", symbol: "My Data" },
+  { id: "settings",  icon: "\u2022", symbol: "Settings" },
+];
+
 function Sidebar({
   conversations, setConversations,
   onSelectChat, onNewChat, activeConvId,
   notesHistory, setNotesHistory,
   onSelectNotes, activeNotesIndex,
   open, setOpen,
+  activeTab, onTabChange,
 }) {
 
   const handleDeleteChat = async (e, id) => {
@@ -26,7 +35,6 @@ function Sidebar({
     if (activeNotesIndex === index) onSelectNotes(null);
   };
 
-  // Get preview text from last AI message in conversation
   const getPreview = (conv) => {
     const msgs = conv.messages || [];
     const lastAi = [...msgs].reverse().find((m) => m.role === "ai");
@@ -35,93 +43,123 @@ function Sidebar({
 
   const getMsgCount = (conv) => {
     const msgs = conv.messages || [];
-    return Math.floor(msgs.length / 2); // pairs
+    return Math.floor(msgs.length / 2);
+  };
+
+  const handleNavClick = (tabId) => {
+    onTabChange(tabId);
+    if (window.innerWidth <= 768) setOpen(false); // close on mobile
   };
 
   return (
     <>
       <div className={`sidebar ${open ? "open" : ""}`}>
 
-        {/* Header */}
-        <div className="sidebarHeader">
-          <span className="sidebarTitle">History</span>
-          <button className="closeBtn" onClick={() => setOpen(false)}>✕</button>
+        {/* ── Logo / Brand ── */}
+        <div className="sidebar-brand">
+          <div className="sidebar-brand-icon">A</div>
+          <span className="sidebar-brand-name">OLLAMA AI</span>
+          <button className="sidebar-close-btn" onClick={() => setOpen(false)}>×</button>
         </div>
 
-        {/* New Chat */}
-        <button className="newChatBtn" onClick={() => { onNewChat(); setOpen(false); }}>
-          <span>＋</span> New Chat
-        </button>
+        {/* ── Navigation ── */}
+        <nav className="sidebar-nav">
+          {NAV_ITEMS.map(item => (
+            <button
+              key={item.id}
+              className={`sidebar-nav-item ${activeTab === item.id ? "active" : ""}`}
+              onClick={() => handleNavClick(item.id)}
+              id={`sidebar-nav-${item.id}`}
+            >
+              <span className={`sidebar-nav-icon icon-${item.id}`} aria-hidden="true" />
+              <span className="sidebar-nav-label">{item.symbol}</span>
+            </button>
+          ))}
+        </nav>
 
-        <div className="sidebarBody">
+        <div className="sidebar-divider" />
 
-          {/* ── Chat Conversations ── */}
-          <div className="sectionLabel">💬 Chats</div>
-          <div className="historyList">
-            {conversations.length === 0 ? (
-              <div className="emptyState">No chats yet</div>
-            ) : (
-              conversations.map((conv) => (
-                <div
-                  key={conv._id}
-                  className={`historyCard ${activeConvId === conv._id ? "active" : ""}`}
-                  onClick={() => { onSelectChat(conv); setOpen(false); }}
-                >
-                  <div className="historyContent">
-                    <div className="historyTitle">
-                      {conv.title?.length > 30
-                        ? conv.title.slice(0, 30) + "…"
-                        : conv.title || "New conversation"}
+        {/* ── Context panel based on active tab ── */}
+        {activeTab === "chat" && (
+          <div className="sidebar-panel">
+            <button className="new-chat-btn" onClick={() => { onNewChat(); setOpen(false); }}>
+              <span>＋</span> New Chat
+            </button>
+            <div className="sidebar-section-label">Recent Chats</div>
+            <div className="sidebar-history-list">
+              {conversations.length === 0 ? (
+                <div className="sidebar-empty">No chats yet</div>
+              ) : (
+                conversations.map((conv) => (
+                  <div
+                    key={conv._id}
+                    className={`sidebar-history-card ${activeConvId === conv._id ? "active" : ""}`}
+                    onClick={() => { onSelectChat(conv); setOpen(false); }}
+                  >
+                    <div className="sidebar-history-content">
+                      <div className="sidebar-history-title">
+                        {conv.title?.length > 28 ? conv.title.slice(0, 28) + "…" : conv.title || "New conversation"}
+                      </div>
+                      <div className="sidebar-history-preview">
+                        {getPreview(conv)}… · {getMsgCount(conv)} msg{getMsgCount(conv) !== 1 ? "s" : ""}
+                      </div>
                     </div>
-                    <div className="historyPreview">
-                      {getPreview(conv)}… · {getMsgCount(conv)} msg{getMsgCount(conv) !== 1 ? "s" : ""}
-                    </div>
+                    <button
+                      className="sidebar-delete-btn"
+                      onClick={(e) => handleDeleteChat(e, conv._id)}
+                      title="Delete"
+                    >🗑</button>
                   </div>
-                  <button
-                    className="deleteBtn"
-                    onClick={(e) => handleDeleteChat(e, conv._id)}
-                    title="Delete conversation"
-                  >🗑</button>
-                </div>
-              ))
-            )}
+                ))
+              )}
+            </div>
           </div>
+        )}
 
-          {/* ── Notes History ── */}
-          <hr className="sidebarDivider" />
-          <div className="sectionLabel">📝 Notes</div>
-          <div className="historyList">
-            {notesHistory.length === 0 ? (
-              <div className="emptyState">No notes yet</div>
-            ) : (
-              notesHistory.map((note, i) => (
-                <div
-                  key={i}
-                  className={`historyCard notesCard-sidebar ${activeNotesIndex === i ? "active" : ""}`}
-                  onClick={() => { onSelectNotes(i); setOpen(false); }}
-                >
-                  <div className="historyContent">
-                    <div className="historyTitle">
-                      {note.prompt.length > 30
-                        ? note.prompt.slice(0, 30) + "…"
-                        : note.prompt}
+        {activeTab === "notes" && (
+          <div className="sidebar-panel">
+            <div className="sidebar-section-label">Saved Notes</div>
+            <div className="sidebar-history-list">
+              {notesHistory.length === 0 ? (
+                <div className="sidebar-empty">No notes yet</div>
+              ) : (
+                notesHistory.map((note, i) => (
+                  <div
+                    key={i}
+                    className={`sidebar-history-card ${activeNotesIndex === i ? "active" : ""}`}
+                    onClick={() => { onSelectNotes(i); setOpen(false); }}
+                  >
+                    <div className="sidebar-history-content">
+                      <div className="sidebar-history-title">
+                        {note.prompt.length > 28 ? note.prompt.slice(0, 28) + "…" : note.prompt}
+                      </div>
+                      <div className="sidebar-history-preview">{note.timestamp}</div>
                     </div>
-                    <div className="historyPreview">{note.timestamp}</div>
+                    <button
+                      className="sidebar-delete-btn"
+                      onClick={(e) => handleDeleteNote(e, i)}
+                      title="Delete"
+                    >🗑</button>
                   </div>
-                  <button
-                    className="deleteBtn"
-                    onClick={(e) => handleDeleteNote(e, i)}
-                    title="Delete note"
-                  >🗑</button>
-                </div>
-              ))
-            )}
+                ))
+              )}
+            </div>
           </div>
+        )}
 
-        </div>
+        {(activeTab === "reminders" || activeTab === "userdata" || activeTab === "settings") && (
+          <div className="sidebar-panel sidebar-info-panel">
+            <div className="sidebar-info-text">
+              {activeTab === "reminders" && "View upcoming exams, events and deadlines in the main area."}
+              {activeTab === "userdata" && "AI learns from your chats and stores your personal info here."}
+              {activeTab === "settings" && "Adjust theme, font size, account and AI preferences."}
+            </div>
+          </div>
+        )}
+
       </div>
 
-      {open && <div className="overlay" onClick={() => setOpen(false)} />}
+      {open && <div className="sidebar-overlay" onClick={() => setOpen(false)} />}
     </>
   );
 }

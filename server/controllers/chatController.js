@@ -2,152 +2,209 @@ import Chat from "../models/Chat.js";
 import { generateResponse } from "../services/ollamaService.js";
 import { combinedSearch } from "../services/searchService.js";
 import { searchImages } from "../services/imageService.js";
+import { fetchWeather, extractLocationFromQuery } from "../services/weatherService.js";
+import { fetchNews } from "../services/newsService.js";
+import { extractUserDataFromMessage, extractRemindersFromMessage } from "./userDataController.js";
 
-// ── System prompts ─────────────────────────────────────────────────────────────
-const CHAT_SYSTEM = `You are an expert AI assistant with deep knowledge across all fields including science, technology, history, mathematics, medicine, law, finance, arts, and more.
+// ── System Prompts ────────────────────────────────────────────────────────────
+const CHAT_SYSTEM = `You are a smart, friendly AI assistant. Be concise and helpful.
 
-RESPONSE RULES:
-- Always give complete, detailed, and accurate answers — never truncate or say "I'll stop here"
-- Use clear structure: bullet points, numbered steps, headers, tables where helpful
-- For factual questions: be precise, cite web search context if provided
-- For creative questions: be imaginative and thorough
-- For math/logic: show full working and explain each step
-- Always answer in the same language the user wrote in
-- Never refuse a reasonable question — if unsure, say so and give your best answer
-- Keep conversation context in mind and refer back to earlier messages when relevant
-- Be direct and confident`;
+Rules:
+- Keep answers SHORT and focused unless the user explicitly asks for detail
+- Use bullet points only when there are 3+ items to list
+- For simple questions, 1-3 sentences is ideal
+- Never pad answers or repeat yourself
+- Match the user's tone: casual → casual, technical → precise
+- Always reply in the language the user wrote in`;
 
-const CODE_SYSTEM = `You are an expert software engineer and coding assistant with mastery of all programming languages, frameworks, algorithms, data structures, system design, and best practices.
+const CODE_SYSTEM = `You are an expert software engineer. Write clean, working code with brief explanations.
 
-RESPONSE RULES:
-- Always provide complete, working, production-ready code — never use placeholders like "// add logic here"
-- Explain what the code does and why, step by step
-- Include error handling in all code
-- Show example input/output where relevant
-- If multiple approaches exist, show the best one and mention alternatives
+Rules:
+- Complete, production-ready code only — no placeholders
+- Short explanation of what it does and why
+- Include error handling
 - Use proper code blocks with language tags
-- Follow best practices and clean code principles
-- If asked to fix a bug, explain what was wrong and why your fix works
-- Always answer in the same language the user wrote in`;
+- Be concise — no filler commentary
+- Reply in the user's language`;
 
-// ── Detect if message is coding related ───────────────────────────────────────
+// ── Code detection ────────────────────────────────────────────────────────────
 const CODE_KEYWORDS = [
   "code", "function", "bug", "error", "fix", "debug", "program", "script",
   "algorithm", "class", "array", "loop", "api", "database", "sql", "html",
   "css", "javascript", "python", "java", "typescript", "react", "node",
   "express", "mongodb", "git", "component", "variable", "syntax", "compile",
   "runtime", "exception", "import", "export", "async", "await", "promise",
-  "fetch", "request", "response", "endpoint", "framework", "library",
-  "implement", "write a", "build a", "create a", "how to code", "how to make",
-  "how to build", "recursion", "complexity", "sort", "search", "binary",
-  "stack", "queue", "linked list", "tree", "graph", "regex", "terminal",
-  "command", "dockerfile", "deploy", "server", "client", "backend", "frontend"
+  "fetch", "endpoint", "framework", "implement", "write a", "build a",
+  "create a", "how to code", "how to build", "recursion", "sort", "search",
+  "binary", "stack", "queue", "linked list", "tree", "graph", "regex",
+  "dockerfile", "deploy", "backend", "frontend",
+];
+const isCodeQuestion = (msg) =>
+  CODE_KEYWORDS.some((kw) => msg.toLowerCase().includes(kw));
+
+// ── Weather / News detection ──────────────────────────────────────────────────
+const WEATHER_KEYWORDS = [
+  "weather", "temperature", "forecast", "rain", "rainfall", "sunny",
+  "humidity", "climate", "storm", "wind", "snow", "fog", "heat",
+  "celsius", "fahrenheit", "mausam", "barish", "garmi", "sardi",
+];
+const NEWS_KEYWORDS = [
+  "news", "latest news", "headlines", "current events", "breaking",
+  "what's happening", "recently", "politics", "sports news", "tech news",
+  "खबर", "samachar", "today's news", "latest updates",
 ];
 
-const isCodeQuestion = (message) => {
-  const lower = message.toLowerCase();
-  return CODE_KEYWORDS.some((kw) => lower.includes(kw));
-};
+const isWeatherQuery = (msg) =>
+  WEATHER_KEYWORDS.some(kw => msg.toLowerCase().includes(kw));
+const isNewsQuery = (msg) =>
+  NEWS_KEYWORDS.some(kw => msg.toLowerCase().includes(kw));
 
-// ── Decide if web context helps ───────────────────────────────────────────────
-const needsWebContext = async (message) => {
-  const prompt = `Does this question need current/real-world factual information from the web?
-Reply ONLY "YES" or "NO".
-Question: "${message}"`;
-  try {
-    const d = await generateResponse(prompt, "chat");
-    return d.trim().toUpperCase().startsWith("YES");
-  } catch {
-    return false;
-  }
-};
-
-const extractQuery = async (message) => {
-  const prompt = `Extract the best web search query for this message. Reply ONLY with the query.
-Message: "${message}"`;
-  try {
-    const q = await generateResponse(prompt, "chat");
-    return q.trim().slice(0, 100);
-  } catch {
-    return message.slice(0, 100);
-  }
+// ── Keyword-based web search gate (no LLM call) ───────────────────────────────
+const SEARCH_KEYWORDS = [
+  "who is", "what is the latest", "current", "right now", "today",
+  "this year", "2024", "2025", "2026", "price of", "stock", "how much is",
+  "when did", "recent", "just happened", "announced", "released",
+  "president", "prime minister", "ceo of", "founded", "located in",
+  "movie", "season", "episode", "release date", "schedule",
+];
+const needsWebSearch = (msg) => {
+  const lower = msg.toLowerCase();
+  return SEARCH_KEYWORDS.some(kw => lower.includes(kw));
 };
 
 // ── Send Message ──────────────────────────────────────────────────────────────
 export const sendMessage = async (req, res) => {
   try {
     const { message, conversationId } = req.body;
-    const userId = req.userId; // Get userId from authenticated user
+    const userId = req.userId;
 
-    // Detect model to use
-    const modelType   = isCodeQuestion(message) ? "code" : "chat";
+    const modelType    = isCodeQuestion(message) ? "code" : "chat";
     const systemPrompt = modelType === "code" ? CODE_SYSTEM : CHAT_SYSTEM;
+
+    const weatherQuery = isWeatherQuery(message);
+    const newsQuery    = isNewsQuery(message);
+    const doSearch     = !weatherQuery && !newsQuery && needsWebSearch(message);
 
     // Load or create conversation
     let conversation;
     if (conversationId) {
-      // Ensure user owns this conversation
       conversation = await Chat.findOne({ _id: conversationId, userId });
-      if (!conversation) {
+      if (!conversation)
         return res.status(404).json({ error: "Conversation not found or access denied" });
-      }
     }
     if (!conversation) {
-      conversation = new Chat({ 
-        userId,
-        title: message.slice(0, 60), 
-        messages: [] 
-      });
+      conversation = new Chat({ userId, title: message.slice(0, 60), messages: [] });
     }
 
-    // Build conversation history context
+    // Build conversation history (last 8 messages)
     const historyContext = conversation.messages
-      .slice(-10)
+      .slice(-8)
       .map((m) => `${m.role === "user" ? "User" : "Assistant"}: ${m.content}`)
       .join("\n");
 
-    // Fetch search + images in parallel
-    const searchQuery = await extractQuery(message);
-    const [searchResults, images, useWebContext] = await Promise.all([
-      combinedSearch(searchQuery),
-      searchImages(searchQuery, 6),
-      needsWebContext(message),
-    ]);
+    // ── Run data fetches in parallel based on query type ──────────────────────
+    let weatherData = null;
+    let newsData    = [];
+    let searchResults = [];
+    let images      = [];
+    let searchQuery = "";
 
-    // Build final prompt
-    let aiPrompt = `${systemPrompt}\n\n`;
+    if (weatherQuery) {
+      // Real weather from wttr.in
+      const location = extractLocationFromQuery(message) || "Mumbai";
+      weatherData = await fetchWeather(location);
+      // Fallback to search snippet if wttr.in fails
+      if (!weatherData) {
+        searchQuery = message.trim().slice(0, 100);
+        const results = await combinedSearch(searchQuery);
+        const snippet = results.find(r =>
+          r.snippet?.toLowerCase().includes("°") ||
+          r.snippet?.toLowerCase().includes("temperature")
+        ) || results[0];
+        if (snippet) {
+          weatherData = { raw: snippet.snippet, title: snippet.title, source: snippet.source, query: searchQuery };
+        }
+      }
+    } else if (newsQuery) {
+      // Real news from RSS feeds
+      newsData = await fetchNews(message, 5);
+      // Fallback to search if RSS fails
+      if (newsData.length === 0) {
+        searchQuery = message.trim().slice(0, 100);
+        const results = await combinedSearch(searchQuery);
+        newsData = results.slice(0, 5).map(r => ({
+          title: r.title, snippet: r.snippet, url: r.url, source: r.source,
+        }));
+      }
+    } else if (doSearch) {
+      // General web search
+      searchQuery = message.replace(/[?!.]/g, "").trim().slice(0, 100);
+      [searchResults, images] = await Promise.all([
+        combinedSearch(searchQuery),
+        modelType === "chat" ? searchImages(searchQuery, 4) : Promise.resolve([]),
+      ]);
+    }
+
+    // ── Build AI prompt ───────────────────────────────────────────────────────
+    let aiPrompt = systemPrompt + "\n\n";
 
     if (historyContext) {
-      aiPrompt += `--- Conversation so far ---\n${historyContext}\n\n`;
+      aiPrompt += `Previous messages:\n${historyContext}\n\n`;
     }
 
-    if (useWebContext && searchResults.length > 0) {
-      const webContext = searchResults
-        .map((r) => `[${r.source}] ${r.title}: ${r.snippet}`)
+    // Web context only for non-weather/news
+    if (doSearch && searchResults.length > 0) {
+      const webCtx = searchResults.slice(0, 3)
+        .map(r => `${r.source}: ${r.snippet}`)
         .join("\n");
-      aiPrompt += `--- Web search results for "${searchQuery}" ---\n${webContext}\n\n`;
+      aiPrompt += `Web context:\n${webCtx}\n\n`;
     }
 
-    aiPrompt += `--- Current question ---\nUser: ${message}\nAssistant:`;
+    // Tell AI the widget handles the data — keep response brief
+    if (weatherQuery && weatherData) {
+      const loc = weatherData.location || weatherData.query || "the requested location";
+      const temp = weatherData.current?.temperature != null
+        ? `${weatherData.current.temperature}°C`
+        : "";
+      const cond = weatherData.current?.condition || "";
+      aiPrompt += `Note: A live weather card is showing: ${loc}${temp ? ", " + temp : ""}${cond ? ", " + cond : ""}. Give a very brief 1-sentence friendly comment about this weather. Don't repeat numbers.\n\n`;
+    } else if (weatherQuery) {
+      aiPrompt += `Note: Weather data could not be fetched. Give a brief helpful response.\n\n`;
+    }
+
+    if (newsQuery && newsData.length > 0) {
+      aiPrompt += `Note: ${newsData.length} live news articles are shown in the news widget. Give a 1-sentence intro like "Here's what's making headlines:" and let the widget do the rest.\n\n`;
+    } else if (newsQuery) {
+      aiPrompt += `Note: News feed unavailable. Give a brief helpful response.\n\n`;
+    }
+
+    aiPrompt += `User: ${message}\nAssistant:`;
 
     const aiResponse = await generateResponse(aiPrompt, modelType);
 
-    // Save to DB
+    // Save conversation
     conversation.messages.push({ role: "user", content: message });
     conversation.messages.push({ role: "ai", content: aiResponse });
     await conversation.save();
 
+    // Background: extract user data + reminders (non-blocking)
+    extractUserDataFromMessage(message, userId).catch(e => console.error("userData:", e.message));
+    extractRemindersFromMessage(message, userId).catch(e => console.error("reminders:", e.message));
+
     res.json({
       conversationId: conversation._id,
-      title: conversation.title,
-      userMessage: message,
-      aiMessage: aiResponse,
-      modelUsed: modelType,       // send back which model was used
+      title:          conversation.title,
+      userMessage:    message,
+      aiMessage:      aiResponse,
+      modelUsed:      modelType,
       searchResults,
       images,
       searchQuery,
-      webEnhanced: useWebContext,
+      webEnhanced:    doSearch && searchResults.length > 0,
+      weather:        weatherData,
+      news:           newsData,
     });
+
   } catch (err) {
     console.error("sendMessage error:", err);
     res.status(500).json({ error: err.message });
@@ -157,8 +214,7 @@ export const sendMessage = async (req, res) => {
 // ── Get all conversations ─────────────────────────────────────────────────────
 export const getChats = async (req, res) => {
   try {
-    const userId = req.userId; // Get userId from authenticated user
-    const chats = await Chat.find({ userId })
+    const chats = await Chat.find({ userId: req.userId })
       .sort({ updatedAt: -1 })
       .select("title messages updatedAt");
     res.json(chats);
@@ -170,9 +226,8 @@ export const getChats = async (req, res) => {
 // ── Get single conversation ───────────────────────────────────────────────────
 export const getConversation = async (req, res) => {
   try {
-    const userId = req.userId; // Get userId from authenticated user
-    const chat = await Chat.findOne({ _id: req.params.id, userId });
-    if (!chat) return res.status(404).json({ error: "Conversation not found or access denied" });
+    const chat = await Chat.findOne({ _id: req.params.id, userId: req.userId });
+    if (!chat) return res.status(404).json({ error: "Not found" });
     res.json(chat);
   } catch (err) {
     res.status(500).json({ error: err.message });
@@ -182,11 +237,8 @@ export const getConversation = async (req, res) => {
 // ── Delete conversation ───────────────────────────────────────────────────────
 export const deleteChat = async (req, res) => {
   try {
-    const userId = req.userId; // Get userId from authenticated user
-    const result = await Chat.findOneAndDelete({ _id: req.params.id, userId });
-    if (!result) {
-      return res.status(404).json({ error: "Conversation not found or access denied" });
-    }
+    const result = await Chat.findOneAndDelete({ _id: req.params.id, userId: req.userId });
+    if (!result) return res.status(404).json({ error: "Not found" });
     res.json({ success: true });
   } catch (err) {
     res.status(500).json({ error: err.message });

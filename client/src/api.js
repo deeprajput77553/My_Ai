@@ -30,3 +30,14 @@ export const deleteChat        = (id)   => API.delete(`/chat/${id}`);
 export const generateNotes          = (prompt)   => API.post("/notes/generate", { prompt });
 export const parseQuestionsFromFile = (text)     => API.post("/notes/parse-questions", { text });
 export const answerQuestion         = (question) => API.post("/notes/answer", { question });
+
+// ── User Data ──────────────────────────────────────
+export const getUserData        = ()         => API.get("/userdata");
+export const addProfileEntry    = (entry)    => API.post("/userdata/profile", entry);
+export const updateProfileEntry = (id, data) => API.put(`/userdata/profile/${id}`, data);
+export const deleteProfileEntry = (id)       => API.delete(`/userdata/profile/${id}`);
+
+// ── Reminders ─────────────────────────────────────
+export const addReminder    = (data) => API.post("/userdata/reminders", data);
+export const updateReminder = (id, data) => API.put(`/userdata/reminders/${id}`, data);
+export const deleteReminder = (id)   => API.delete(`/userdata/reminders/${id}`);
