@@ -2,10 +2,14 @@ import { useEffect, useState, useRef, useCallback } from "react";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
 import { sendMessage, getChats, getConversation } from "./api";
+import { useAuth } from "./contexts/AuthContext";
+import AuthPage from "./components/AuthPage";
 import Sidebar from "./components/Sidebar";
 import Notes from "./components/Notes";
 import SourcesPanel from "./components/SourcesPanel";
 import CodeBlock from "./components/CodeBlock";
+import WeatherWidget from "./components/WeatherWidget";
+import NewsWidget from "./components/NewsWidget";
 import "./App.css";
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -16,6 +20,14 @@ function useVoice({ onTranscript, onAutoSend }) {
   const [supported,  setSupported]  = useState(false);
   const [ttsEnabled, setTtsEnabled] = useState(true);
   const recognitionRef = useRef(null);
+  const onTranscriptRef = useRef(onTranscript);
+  const onAutoSendRef = useRef(onAutoSend);
+
+  // Keep refs updated
+  useEffect(() => {
+    onTranscriptRef.current = onTranscript;
+    onAutoSendRef.current = onAutoSend;
+  }, [onTranscript, onAutoSend]);
 
   useEffect(() => {
     const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
@@ -35,9 +47,13 @@ function useVoice({ onTranscript, onAutoSend }) {
         else                 interim += result[0].transcript;
       }
       // Show whatever we have so far in the input box
-      onTranscript(final || interim);
+      if (onTranscriptRef.current) {
+        onTranscriptRef.current(final || interim);
+      }
       // Auto-send when we get a final result
-      if (final.trim()) onAutoSend(final.trim());
+      if (final.trim() && onAutoSendRef.current) {
+        onAutoSendRef.current(final.trim());
+      }
     };
 
     rec.onend  = () => setListening(false);
@@ -57,8 +73,13 @@ function useVoice({ onTranscript, onAutoSend }) {
       rec.stop();
       setListening(false);
     } else {
-      try { rec.start(); setListening(true); }
-      catch { /* already started */ }
+      try { 
+        rec.start(); 
+        setListening(true); 
+      }
+      catch (err) { 
+        console.warn("Mic start error:", err);
+      }
     }
   }, [listening]);
 
@@ -206,6 +227,8 @@ function UserMessage({ content, onResend }) {
 // App
 // ─────────────────────────────────────────────────────────────────────────────
 function App() {
+  const { isAuthenticated, loading: authLoading, user, logout } = useAuth();
+  
   const [tab, setTab]                             = useState("chat");
   const [message, setMessage]                     = useState("");
   const [conversations, setConversations]         = useState([]);
@@ -231,8 +254,10 @@ function App() {
   });
 
   useEffect(() => {
-    getChats().then((r) => setConversations(r.data));
-  }, []);
+    if (isAuthenticated) {
+      getChats().then((r) => setConversations(r.data));
+    }
+  }, [isAuthenticated]);
 
   useEffect(() => {
     bottomRef.current?.scrollIntoView({ behavior: "smooth" });
@@ -276,7 +301,7 @@ function App() {
 
     try {
       const res = await sendMessage(text, resolvedConvId);
-      const { conversationId: newConvId, aiMessage, searchResults, images, searchQuery, modelUsed } = res.data;
+      const { conversationId: newConvId, aiMessage, searchResults, images, searchQuery, modelUsed, weather, news } = res.data;
 
       setConversationId(newConvId);
       setDisplayedMessages((prev) => [...prev, { role: "ai", content: aiMessage, _displayId: aiDisplayId }]);
@@ -284,7 +309,14 @@ function App() {
 
       setMsgMeta((prev) => ({
         ...prev,
-        [aiDisplayId]: { searchResults: searchResults || [], images: images || [], searchQuery, modelUsed },
+        [aiDisplayId]: { 
+          searchResults: searchResults || [], 
+          images: images || [], 
+          searchQuery, 
+          modelUsed,
+          weather: weather || null,
+          news: news || []
+        },
       }));
 
       // 🔊 Speak the AI response when typing animation finishes
@@ -334,6 +366,35 @@ function App() {
     messagePairs.push({ userM: displayedMessages[i], aiM: displayedMessages[i + 1], pairStart: i });
   }
 
+  // Show loading screen while checking authentication
+  if (authLoading) {
+    return (
+      <div style={{
+        display: "flex",
+        flexDirection: "column",
+        justifyContent: "center",
+        alignItems: "center",
+        height: "100vh",
+        background: "linear-gradient(135deg, #0b0f1a, #020617)",
+        gap: "16px"
+      }}>
+        <div className="dots">
+          <span style={{ background: "#38bdf8" }}></span>
+          <span style={{ background: "#38bdf8" }}></span>
+          <span style={{ background: "#38bdf8" }}></span>
+        </div>
+        <div style={{ fontSize: "16px", color: "#94a3b8", fontWeight: 500 }}>
+          Loading...
+        </div>
+      </div>
+    );
+  }
+
+  // Show auth page if not authenticated
+  if (!isAuthenticated) {
+    return <AuthPage />;
+  }
+
   // ─────────────────────────────────────────────────────────────────────────
   return (
     <div className="app">
@@ -360,6 +421,24 @@ function App() {
           <div className="tabs">
             <button className={`tabBtn ${tab === "chat"  ? "activeTab" : ""}`} onClick={() => { setTab("chat");  setLoadedNote(null); }}>💬 Chat</button>
             <button className={`tabBtn ${tab === "notes" ? "activeTab" : ""}`} onClick={() => setTab("notes")}>📝 Notes</button>
+          </div>
+          <div style={{ marginLeft: "auto", display: "flex", alignItems: "center", gap: "12px" }}>
+            <span style={{ fontSize: "14px", color: "#94a3b8" }}>👤 {user?.name}</span>
+            <button 
+              onClick={logout}
+              style={{
+                padding: "6px 12px",
+                background: "rgba(239, 68, 68, 0.1)",
+                color: "#ef4444",
+                border: "1px solid rgba(239, 68, 68, 0.3)",
+                borderRadius: "6px",
+                cursor: "pointer",
+                fontSize: "13px",
+                fontWeight: 500,
+              }}
+            >
+              Logout
+            </button>
           </div>
         </div>
 
@@ -408,6 +487,22 @@ function App() {
                               images={msgMeta[aiM._displayId].images}
                               searchQuery={msgMeta[aiM._displayId].searchQuery}
                             />
+                          </div>
+                        </div>
+                      )}
+
+                      {msgMeta[aiM._displayId]?.weather && (
+                        <div className="aiRow">
+                          <div style={{ maxWidth: "75%", width: "100%" }}>
+                            <WeatherWidget weatherData={msgMeta[aiM._displayId].weather} />
+                          </div>
+                        </div>
+                      )}
+
+                      {msgMeta[aiM._displayId]?.news && msgMeta[aiM._displayId].news.length > 0 && (
+                        <div className="aiRow">
+                          <div style={{ maxWidth: "75%", width: "100%" }}>
+                            <NewsWidget newsData={msgMeta[aiM._displayId].news} />
                           </div>
                         </div>
                       )}

@@ -464,3 +464,19 @@
 
 .markdownBody th:first-child { border-radius: 0; }
 .markdownBody th:last-child  { border-radius: 0; }
+
+
+/* ===== DOWNLOAD ALL BUTTONS ===== */
+.downloadAllBtns {
+  display: flex;
+  gap: 8px;
+  margin-left: auto;
+  padding-left: 16px;
+  border-left: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+.downloadAllBtns .downloadBtn {
+  font-size: 12px;
+  padding: 6px 12px;
+  white-space: nowrap;
+}

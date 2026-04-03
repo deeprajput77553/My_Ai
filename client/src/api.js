@@ -4,6 +4,20 @@ const API = axios.create({
   baseURL: "http://localhost:5000/api",
 });
 
+// Add token to all requests if it exists
+API.interceptors.request.use(
+  (config) => {
+    const token = localStorage.getItem("token");
+    if (token) {
+      config.headers.Authorization = `Bearer ${token}`;
+    }
+    return config;
+  },
+  (error) => {
+    return Promise.reject(error);
+  }
+);
+
 // ── Chat ──────────────────────────────────────────
 export const sendMessage       = (message, conversationId) =>
   API.post("/chat", { message, conversationId });

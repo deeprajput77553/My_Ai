@@ -106,6 +106,29 @@ function Notes({ onNotesSaved, preloadedNote }) {
           setAnswers({});
           setActiveQ(0);
           setMode("qa");
+          
+          // Load all answers together
+          setQaLoading(true);
+          const allAnswers = {};
+          for (let i = 0; i < parsed.length; i++) {
+            try {
+              const res = await answerQuestion(parsed[i]);
+              allAnswers[i] = {
+                answer:        res.data.answer,
+                searchResults: res.data.searchResults || [],
+                images:        res.data.images        || [],
+              };
+            } catch (err) {
+              console.error(`Failed to answer question ${i}:`, err);
+              allAnswers[i] = {
+                answer: "Failed to generate answer.",
+                searchResults: [],
+                images: [],
+              };
+            }
+          }
+          setAnswers(allAnswers);
+          setQaLoading(false);
         } else {
           // Fallback: treat as notes prompt
           const res = await generateNotes(combined.slice(0, 1500));
@@ -149,6 +172,38 @@ function Notes({ onNotesSaved, preloadedNote }) {
   const handleQaPillClick = (i) => {
     setActiveQ(i);
     if (!answers[i]) handleAnswerQuestion(i);
+  };
+
+  const downloadAllQA = async (format) => {
+    if (Object.keys(answers).length === 0) return;
+
+    // Build combined content
+    let combinedContent = `# Questions and Answers\n\n`;
+    combinedContent += `Generated from: ${file?.name || "Document"}\n\n`;
+    combinedContent += `---\n\n`;
+
+    questions.forEach((q, i) => {
+      combinedContent += `## Question ${i + 1}\n\n`;
+      combinedContent += `${q}\n\n`;
+      if (answers[i]) {
+        combinedContent += `### Answer\n\n`;
+        combinedContent += `${answers[i].answer}\n\n`;
+        combinedContent += `---\n\n`;
+      }
+    });
+
+    const filename = `${(file?.name || "QA").slice(0, 30).replace(/\s+/g, "_")}_all_questions`;
+
+    if (format === "pdf") {
+      // Create a temporary div with all content
+      const tempDiv = document.createElement("div");
+      tempDiv.innerHTML = `<div class="markdownBody">${combinedContent.replace(/\n/g, "<br>")}</div>`;
+      document.body.appendChild(tempDiv);
+      await exportToPdf({ current: tempDiv }, filename);
+      document.body.removeChild(tempDiv);
+    } else {
+      await exportToDocx(combinedContent, filename);
+    }
   };
 
   const handleKeyDown = (e) => {
@@ -224,7 +279,24 @@ function Notes({ onNotesSaved, preloadedNote }) {
                 onClick={() => handleQaPillClick(i)}
               >Q{i + 1}</button>
             ))}
+            {Object.keys(answers).length > 0 && (
+              <div className="downloadAllBtns">
+                <button className="downloadBtn" onClick={() => downloadAllQA("pdf")}>
+                  ⬇ All PDF
+                </button>
+                <button className="downloadBtn docx" onClick={() => downloadAllQA("docx")}>
+                  ⬇ All DOCX
+                </button>
+              </div>
+            )}
           </div>
+
+          {qaLoading && Object.keys(answers).length === 0 && (
+            <div className="notesLoading">
+              <div className="dots"><span/><span/><span/></div>
+              <div>Loading all questions and answers...</div>
+            </div>
+          )}
 
           <div className="qaContent">
             {activeQ !== null && (

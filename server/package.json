@@ -5,18 +5,21 @@
   "main": "server.js",
   "type": "module",
   "scripts": {
-    "dev": "nodemon server.js"
+    "dev": "nodemon server.js",
+    "setup-indexes": "node scripts/setupIndexes.js"
   },
   "keywords": [],
   "author": "",
   "license": "ISC",
   "dependencies": {
     "axios": "^1.14.0",
+    "bcryptjs": "^3.0.3",
     "cheerio": "1.0.0-rc.12",
     "concurrently": "^9.2.1",
     "cors": "^2.8.6",
     "dotenv": "^17.3.1",
     "express": "^5.2.1",
+    "jsonwebtoken": "^9.0.3",
     "mongoose": "^9.3.3",
     "undici": "^5.29.0",
     "uuid": "^13.0.0"

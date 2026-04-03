@@ -77,6 +77,7 @@ Message: "${message}"`;
 export const sendMessage = async (req, res) => {
   try {
     const { message, conversationId } = req.body;
+    const userId = req.userId; // Get userId from authenticated user
 
     // Detect model to use
     const modelType   = isCodeQuestion(message) ? "code" : "chat";
@@ -85,10 +86,18 @@ export const sendMessage = async (req, res) => {
     // Load or create conversation
     let conversation;
     if (conversationId) {
-      conversation = await Chat.findById(conversationId);
+      // Ensure user owns this conversation
+      conversation = await Chat.findOne({ _id: conversationId, userId });
+      if (!conversation) {
+        return res.status(404).json({ error: "Conversation not found or access denied" });
+      }
     }
     if (!conversation) {
-      conversation = new Chat({ title: message.slice(0, 60), messages: [] });
+      conversation = new Chat({ 
+        userId,
+        title: message.slice(0, 60), 
+        messages: [] 
+      });
     }
 
     // Build conversation history context
@@ -148,7 +157,8 @@ export const sendMessage = async (req, res) => {
 // ── Get all conversations ─────────────────────────────────────────────────────
 export const getChats = async (req, res) => {
   try {
-    const chats = await Chat.find()
+    const userId = req.userId; // Get userId from authenticated user
+    const chats = await Chat.find({ userId })
       .sort({ updatedAt: -1 })
       .select("title messages updatedAt");
     res.json(chats);
@@ -160,8 +170,9 @@ export const getChats = async (req, res) => {
 // ── Get single conversation ───────────────────────────────────────────────────
 export const getConversation = async (req, res) => {
   try {
-    const chat = await Chat.findById(req.params.id);
-    if (!chat) return res.status(404).json({ error: "Not found" });
+    const userId = req.userId; // Get userId from authenticated user
+    const chat = await Chat.findOne({ _id: req.params.id, userId });
+    if (!chat) return res.status(404).json({ error: "Conversation not found or access denied" });
     res.json(chat);
   } catch (err) {
     res.status(500).json({ error: err.message });
@@ -171,7 +182,11 @@ export const getConversation = async (req, res) => {
 // ── Delete conversation ───────────────────────────────────────────────────────
 export const deleteChat = async (req, res) => {
   try {
-    await Chat.findByIdAndDelete(req.params.id);
+    const userId = req.userId; // Get userId from authenticated user
+    const result = await Chat.findOneAndDelete({ _id: req.params.id, userId });
+    if (!result) {
+      return res.status(404).json({ error: "Conversation not found or access denied" });
+    }
     res.json({ success: true });
   } catch (err) {
     res.status(500).json({ error: err.message });
