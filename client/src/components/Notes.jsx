@@ -1,4 +1,5 @@
 import { useState, useRef } from "react";
+import { DragDropContext, Droppable, Draggable } from "@hello-pangea/dnd";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
 import { generateNotes, parseQuestionsFromFile, answerQuestion } from "../api";
@@ -62,7 +63,8 @@ function Notes({ onNotesSaved, preloadedNote }) {
   const [answers, setAnswers]           = useState({});
   const [activeQ, setActiveQ]           = useState(null);
   const [qaLoading, setQaLoading]       = useState(false);
-  const [mode, setMode]                 = useState("notes");
+  const [mode, setMode]                 = useState("notes"); // notes, preview, qa
+  const [isGeneratingAll, setIsGeneratingAll] = useState(false);
 
   const fileInputRef = useRef(null);
   const notesRef     = useRef(null);
@@ -104,31 +106,7 @@ function Notes({ onNotesSaved, preloadedNote }) {
         if (parsed.length > 0) {
           setQuestions(parsed);
           setAnswers({});
-          setActiveQ(0);
-          setMode("qa");
-          
-          // Load all answers together
-          setQaLoading(true);
-          const allAnswers = {};
-          for (let i = 0; i < parsed.length; i++) {
-            try {
-              const res = await answerQuestion(parsed[i]);
-              allAnswers[i] = {
-                answer:        res.data.answer,
-                searchResults: res.data.searchResults || [],
-                images:        res.data.images        || [],
-              };
-            } catch (err) {
-              console.error(`Failed to answer question ${i}:`, err);
-              allAnswers[i] = {
-                answer: "Failed to generate answer.",
-                searchResults: [],
-                images: [],
-              };
-            }
-          }
-          setAnswers(allAnswers);
-          setQaLoading(false);
+          setMode("preview");
         } else {
           // Fallback: treat as notes prompt
           const res = await generateNotes(combined.slice(0, 1500));
@@ -139,17 +117,75 @@ function Notes({ onNotesSaved, preloadedNote }) {
           if (onNotesSaved) onNotesSaved(file.name, res.data.notes);
         }
       } else {
-        const res = await generateNotes(prompt);
-        setNotes(res.data.notes);
-        setSearchResults(res.data.searchResults || []);
-        setImages(res.data.images || []);
-        setSearchQuery(prompt);
-        if (onNotesSaved) onNotesSaved(prompt, res.data.notes);
+        // Multi-question input handling
+        const lines = prompt.split("\n").filter(l => l.trim().length > 3);
+        if (lines.length > 1) {
+          setQuestions(lines);
+          setAnswers({});
+          setMode("preview");
+        } else {
+          const res = await generateNotes(prompt);
+          setNotes(res.data.notes);
+          setSearchResults(res.data.searchResults || []);
+          setImages(res.data.images || []);
+          setSearchQuery(prompt);
+          if (onNotesSaved) onNotesSaved(prompt, res.data.notes);
+        }
       }
     } catch (err) {
       console.error("Generation failed:", err);
     }
     setLoading(false);
+  };
+
+  const handleNotesRegenerate = () => {
+    handleGenerate();
+  };
+
+  const handleDragEnd = (result) => {
+    if (!result.destination) return;
+    const list = [...questions];
+    const [reorderedItem] = list.splice(result.source.index, 1);
+    list.splice(result.destination.index, 0, reorderedItem);
+    setQuestions(list);
+  };
+
+  const handleStartGeneration = async () => {
+    setMode("qa");
+    setActiveQ(0);
+    setIsGeneratingAll(true);
+    setQaLoading(true);
+
+    const allAnswers = {};
+    for (let i = 0; i < questions.length; i++) {
+        try {
+          const res = await answerQuestion(questions[i]);
+          allAnswers[i] = {
+            answer:        res.data.answer,
+            searchResults: res.data.searchResults || [],
+            images:        res.data.images        || [],
+          };
+          // Update state as we go for better UX
+          setAnswers({...allAnswers});
+        } catch (err) {
+          console.error(`Failed to answer question ${i}:`, err);
+          allAnswers[i] = {
+            answer: "Failed to generate answer.",
+            searchResults: [],
+            images: [],
+          };
+          setAnswers({...allAnswers});
+        }
+    }
+    setIsGeneratingAll(false);
+    setQaLoading(false);
+  };
+
+  const removeQuestion = (idx) => {
+    const list = [...questions];
+    list.splice(idx, 1);
+    setQuestions(list);
+    if (list.length === 0) setMode("notes");
   };
 
   const handleAnswerQuestion = async (index) => {
@@ -264,9 +300,56 @@ function Notes({ onNotesSaved, preloadedNote }) {
           onClick={handleGenerate}
           disabled={loading || (!prompt.trim() && !file)}
         >
-          {loading ? "Working…" : "✦ Generate"}
+          {loading ? "Discovering…" : "✦ Analyze"}
         </button>
       </div>
+
+      {/* ── Preview Mode ── */}
+      {mode === "preview" && (
+        <div className="previewSection">
+          <div className="qaHeader">
+            <div className="qaTitle">
+              <i className="fi fi-rr-edit"></i>
+              <span>Refine Topics & Questions</span>
+            </div>
+            <button className="previewStartBtn" onClick={handleStartGeneration}>
+              ✦ Start Sequential Generation
+            </button>
+          </div>
+          <DragDropContext onDragEnd={handleDragEnd}>
+            <Droppable droppableId="questions-list">
+              {(provided) => (
+                <div 
+                  className="previewList" 
+                  {...provided.droppableProps} 
+                  ref={provided.innerRef}
+                >
+                  {questions.map((q, i) => (
+                    <Draggable key={`${q}-${i}`} draggableId={`q-${i}`} index={i}>
+                      {(provided, snapshot) => (
+                        <div 
+                          className={`previewRow ${snapshot.isDragging ? "dragging" : ""}`}
+                          ref={provided.innerRef}
+                          {...provided.draggableProps}
+                          {...provided.dragHandleProps}
+                        >
+                          <div className="previewHandle">⠿</div>
+                          <div className="previewIndex">{i + 1}</div>
+                          <div className="previewText">{q}</div>
+                          <button className="previewDelete" onClick={(e) => { e.stopPropagation(); removeQuestion(i); }} title="Delete Topic">
+                            <i className="fi fi-rr-trash"></i>
+                          </button>
+                        </div>
+                      )}
+                    </Draggable>
+                  ))}
+                  {provided.placeholder}
+                </div>
+              )}
+            </Droppable>
+          </DragDropContext>
+        </div>
+      )}
 
       {/* ── Q&A Mode ── */}
       {mode === "qa" && questions.length > 0 && (
@@ -307,17 +390,27 @@ function Notes({ onNotesSaved, preloadedNote }) {
             )}
           </div>
 
-          {qaLoading && Object.keys(answers).length === 0 && (
-            <div className="notesLoading">
-              <div className="dots"><span/><span/><span/></div>
-              <div>Loading all questions and answers...</div>
+          {isGeneratingAll && (
+            <div className="sequentialLoadingBar">
+              <div className="loadingProgress" style={{ width: `${(Object.keys(answers).length / questions.length) * 100}%` }}></div>
+              <div className="loadingText">Generating answers sequentially... {Object.keys(answers).length} / {questions.length}</div>
             </div>
           )}
 
           <div className="qaContent">
             {activeQ !== null && (
               <>
-                <div className="qaQuestion">{questions[activeQ]}</div>
+                <div className="qaQuestion">
+                  <span>{questions[activeQ]}</span>
+                  {answers[activeQ] && !isGeneratingAll && (
+                    <button className="retryBtn" onClick={() => {
+                      const newAnswers = {...answers};
+                      delete newAnswers[activeQ];
+                      setAnswers(newAnswers);
+                      handleAnswerQuestion(activeQ);
+                    }} title="Retry Answer">🔄</button>
+                  )}
+                </div>
 
                 {!answers[activeQ] && !qaLoading && (
                   <button className="qaGenerateBtn" onClick={() => handleAnswerQuestion(activeQ)}>
@@ -338,6 +431,12 @@ function Notes({ onNotesSaved, preloadedNote }) {
                       <div className="downloadBar">
                         <span className="downloadLabel">Answer — Q{activeQ + 1}</span>
                         <div className="downloadBtns">
+                          <button className="downloadBtn retry-glow" onClick={() => {
+                              const newAnswers = {...answers};
+                              delete newAnswers[activeQ];
+                              setAnswers(newAnswers);
+                              handleAnswerQuestion(activeQ);
+                            }} title="Regenerate individual answer"><i className="fi fi-rr-refresh"></i> Regenerate</button>
                           <button className="downloadBtn" onClick={() => exportToPdf(notesRef, `Q${activeQ + 1}_answer`)}>⬇ PDF</button>
                           <button className="downloadBtn docx" onClick={() => exportToDocx(answers[activeQ].answer, `Q${activeQ + 1}_answer`)}>⬇ DOCX</button>
                         </div>
@@ -389,6 +488,13 @@ function Notes({ onNotesSaved, preloadedNote }) {
               {/* Code-only: no card wrapper, just the block ✅ */}
               {isCodeOnly(notes) ? (
                 <div ref={notesRef}>
+                  <div className="downloadBar" style={{ borderBottom: "none", marginBottom: "8px" }}>
+                    <div className="downloadBtns" style={{ marginLeft: "auto" }}>
+                      <button className="downloadBtn retry-glow" onClick={handleNotesRegenerate} title="Regenerate notes"><i className="fi fi-rr-refresh"></i> Regenerate</button>
+                      <button className="downloadBtn" onClick={() => exportToPdf(notesRef, filename)}>⬇ PDF</button>
+                      <button className="downloadBtn docx" onClick={() => exportToDocx(notes, filename)}>⬇ DOCX</button>
+                    </div>
+                  </div>
                   <MdBody content={notes} />
                 </div>
               ) : (
@@ -396,6 +502,7 @@ function Notes({ onNotesSaved, preloadedNote }) {
                   <div className="downloadBar">
                     <span className="downloadLabel">📄 Generated Notes</span>
                     <div className="downloadBtns">
+                      <button className="downloadBtn retry-glow" onClick={handleNotesRegenerate} title="Regenerate notes"><i className="fi fi-rr-refresh"></i> Regenerate</button>
                       <button className="downloadBtn" onClick={() => exportToPdf(notesRef, filename)}>⬇ PDF</button>
                       <button className="downloadBtn docx" onClick={() => exportToDocx(notes, filename)}>⬇ DOCX</button>
                     </div>

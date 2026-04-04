@@ -11,6 +11,7 @@ const NVIDIA_URL = "https://integrate.api.nvidia.com/v1/chat/completions";
 // model param: "chat" | "code" | any explicit model name
 export const generateResponse = async (prompt, model = "chat", options = {}) => {
   const provider = options.provider || "nvidia"; // Prioritize Nvidia by default
+  let content = "";
 
   if (provider === "nvidia") {
     try {
@@ -24,14 +25,14 @@ export const generateResponse = async (prompt, model = "chat", options = {}) => 
       const payload = {
         model: targetModel,
         messages: [{"role": "user", "content": prompt}],
-        temperature: 1,
+        temperature: 0.7,
         top_p: 1,
         max_tokens: isCode ? 16384 : 4096,
         stream: false,
       };
 
       if (isCode) {
-        payload.extra_body = { chat_template_kwargs: { enable_thinking: true, clear_thinking: false } };
+        payload.extra_body = { chat_template_kwargs: { enable_thinking: false, clear_thinking: true } };
       }
 
       const { data } = await axios.post(NVIDIA_URL, payload, {
@@ -41,14 +42,7 @@ export const generateResponse = async (prompt, model = "chat", options = {}) => 
         }
       });
 
-      let content = data.choices[0]?.message?.content || "";
-      const reasoning = data.choices[0]?.message?.reasoning_content;
-      
-      if (reasoning) {
-         content = `<think>\n${reasoning}\n</think>\n\n` + content;
-      }
-      
-      return content;
+      content = data.choices[0]?.message?.content || "";
     } catch (error) {
       console.error("Nvidia API Error:", error.response?.data || error.message);
       // Fallback to Ollama if Nvidia fails
@@ -56,17 +50,21 @@ export const generateResponse = async (prompt, model = "chat", options = {}) => 
     }
   }
 
-  // Fallback / Explicit to Ollama
-  const resolvedModel =
-    model === "chat" ? CHAT_MODEL :
-    model === "code" ? CODE_MODEL :
-    model;
+  if (!content) {
+    const resolvedModel =
+      model === "chat" ? CHAT_MODEL :
+      model === "code" ? CODE_MODEL :
+      model;
 
-  const { data } = await axios.post(OLLAMA_URL, {
-    model: resolvedModel,
-    prompt,
-    stream: false,
-  });
+    const { data } = await axios.post(OLLAMA_URL, {
+      model: resolvedModel,
+      prompt,
+      stream: false,
+    });
 
-  return data.response;
-};
+    content = data.response;
+  }
+
+  // GLOBAL CLEANUP: Strip <think> tags from any response
+  return content.replace(/<think>[\s\S]*?<\/think>/gi, "").trim();
+};

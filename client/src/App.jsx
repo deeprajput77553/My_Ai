@@ -586,7 +586,7 @@ function App() {
       <div className="main">
 
         {/* ── Sticky topbar ── */}
-        <div className="topbar">
+        <div className="topbar" data-active-tab={activeTab}>
           <button className="menuBtn" onClick={() => setSidebarOpen(o => !o)}>☰</button>
           <h2 className="topbar-title">
             {activeTab === "chat" && "Chat"}

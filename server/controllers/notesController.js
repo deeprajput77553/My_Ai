@@ -29,15 +29,15 @@ STRICT FORMAT RULES:
 - # Main title
 - ## Major sections (at least 4-6 sections)
 - ### Subsections where needed
-- **Bold** all key terms and definitions
-- Use bullet points (- ) for lists, numbered lists for steps/sequences
-- Add a comparison table (| Col | Col |) wherever two or more things can be compared
-- Use > blockquotes for important tips, warnings, or key insights
-- Use \`inline code\` for technical terms, formulas, or code
-- Use \`\`\`language blocks for multi-line code or formulas
-- Add --- between major sections
-- ## Summary at the end with 5-7 key takeaways as bullet points
-- Be exhaustive — cover history, theory, practical use, examples, and common mistakes`;
+- **Bold** key terms (NEVER use code blocks for simple text)
+- Use bullet points (- ) and numbered lists for clarity
+- Use tables (| Col | Col |) for any comparison
+- Use > blockquotes for important tips or hints
+- Use \`\`\`info code blocks ONLY for the final "Summary" or "Key Takeaways" section.
+- Use \`\`\`language blocks ONLY for actual multi-line code snippets
+- Be exhaustive — cover history, theory, examples, and common mistakes
+- ## Summary at the end inside an \`\`\`info block
+`;
 
     const notes = await generateResponse(notesPrompt);
     res.json({ notes, searchResults, images });
@@ -52,12 +52,18 @@ export const parseQuestions = async (req, res) => {
   try {
     const { text } = req.body;
 
-    const parsePrompt = `Extract every question or topic from the text below.
+    const parsePrompt = `You are a curriculum designer. Analyze the text below and extract a list of the most important questions, topics, or key concepts that should be explained in detail.
+Focus on identifying:
+1. Core concepts and definitions.
+2. "How" and "Why" questions that explain processes.
+3. Comparative topics (X vs Y).
+4. Major themes or structural components of the text.
+
 Return ONLY a raw JSON array of strings. No explanation, no markdown, no preamble.
-Example: ["What is X?", "Explain Y", "Define Z"]
+Example: ["Concept A", "How process B works", "What is C?", "Comparison between D and E"]
 
 Text:
-${text.slice(0, 4000)}`;
+${text.slice(0, 5000)}`;
 
     const raw = await generateResponse(parsePrompt);
 
@@ -101,13 +107,14 @@ Answer this question completely and in full detail: "${question}"
 
 FORMAT RULES:
 - Use ## headings to organize your answer into clear sections
-- Use **bold** for key terms and definitions
+- Use **bold** for key terms (NEVER use code blocks for simple text)
 - Use bullet points and numbered lists for clarity
-- Include a comparison table if the question involves comparing things
-- Include worked examples where relevant
-- Use \`code blocks\` for any code, formulas, or commands
+- Include a comparison table if relevant
+- Use \`code blocks\` ONLY for actual code, formulas, or commands.
+- Wrap the final "Key Takeaways" section in an \`\`\`info block for a cleaner look.
 - Do NOT cut the answer short — cover every aspect
-- End with ## Key Takeaways (5 bullet points summarizing the most important points)`;
+- End with ## Key Takeaways
+`;
 
     const answer = await generateResponse(answerPrompt);
     res.json({ answer, searchResults, images });

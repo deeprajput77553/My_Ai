@@ -80,6 +80,27 @@ function CodeBlock({ className, children }) {
     URL.revokeObjectURL(url);
   };
 
+  const isInfo = lang === "txt" || lang === "info";
+  const isCompact = isInfo && code.length < 120;
+
+  if (isInfo) {
+    return (
+      <div className={`infoBlock ${isCompact ? "compact" : ""}`}>
+        <div className="infoBlockIcon">
+          <i className={isCompact ? "fi fi-rr-bulb" : "fi fi-rr-info"} />
+        </div>
+        <div className="infoBlockContent">
+          {code}
+        </div>
+        {isCompact ? null : (
+          <button className="infoCopyBtn" onClick={handleCopy} title="Copy Info">
+            <i className={copied ? "fi fi-sr-check" : "fi fi-rr-copy"} />
+          </button>
+        )}
+      </div>
+    );
+  }
+
   return (
     <div className="codeBlock">
       {/* Header bar */}

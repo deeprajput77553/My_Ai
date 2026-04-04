@@ -95,7 +95,7 @@ function SettingsPanel() {
   return (
     <div className="sp-container">
       <div className="sp-header">
-        <span>⚙️</span>
+        <span className="sp-header-main-icon"><i className="fi fi-sr-settings"></i></span>
         <div>
           <h2>Settings</h2>
           <p>Customize your AI experience</p>
@@ -115,7 +115,7 @@ function SettingsPanel() {
         </div>
 
         {/* Edit Name */}
-        <SettingRow icon="✏️" label="Edit Name" description="Change your display name">
+        <SettingRow icon={<i className="fi fi-rr-user"></i>} label="Edit Name" description="Change your display name">
           {editName ? (
             <div className="sp-inline-form">
               <input className="sp-inline-input" value={newName} onChange={e => setNewName(e.target.value)} placeholder="New name" autoFocus />
@@ -129,7 +129,7 @@ function SettingsPanel() {
         {nameMsg && <div className={`sp-inline-msg ${nameMsg.t}`}>{nameMsg.m}</div>}
 
         {/* Change Email */}
-        <SettingRow icon="📧" label="Change Email" description="Update your email address">
+        <SettingRow icon={<i className="fi fi-rr-envelope"></i>} label="Change Email" description="Update your email address">
           {editEmail ? (
             <div className="sp-inline-form sp-inline-form-col">
               <input className="sp-inline-input" value={emailForm.email} onChange={e => setEmailForm(p => ({ ...p, email: e.target.value }))} placeholder="New email" />
@@ -146,7 +146,7 @@ function SettingsPanel() {
         {emailMsg && <div className={`sp-inline-msg ${emailMsg.t}`}>{emailMsg.m}</div>}
 
         {/* Change Password */}
-        <SettingRow icon="🔑" label="Change Password" description="Update your password">
+        <SettingRow icon={<i className="fi fi-rr-lock"></i>} label="Change Password" description="Update your password">
           {editPwd ? (
             <div className="sp-inline-form sp-inline-form-col">
               <input className="sp-inline-input" type="password" value={pwdForm.current} onChange={e => setPwdForm(p => ({ ...p, current: e.target.value }))} placeholder="Current password" />
@@ -162,7 +162,7 @@ function SettingsPanel() {
         </SettingRow>
         {pwdMsg && <div className={`sp-inline-msg ${pwdMsg.t}`}>{pwdMsg.m}</div>}
 
-        <SettingRow icon="🔒" label="Logout" description="Sign out of your account">
+        <SettingRow icon={<i className="fi fi-rr-exit"></i>} label="Logout" description="Sign out of your account">
           <button className="sp-danger-btn" onClick={() => setShowLogout(true)}>Logout</button>
         </SettingRow>
       </Section>
@@ -170,20 +170,20 @@ function SettingsPanel() {
 
       {/* === Display === */}
       <Section title="Display">
-        <SettingRow icon="🌙" label="Theme" description="Choose between dark and light mode">
+        <SettingRow icon={<i className="fi fi-rr-brightness"></i>} label="Theme" description="Choose between dark and light mode">
           <div className="sp-theme-toggle">
             <button
               className={`sp-theme-btn ${settings.theme === "dark" ? "active" : ""}`}
               onClick={() => updateSetting("theme", "dark")}
-            >🌙 Dark</button>
+            ><i className="fi fi-rr-moon"></i> Dark</button>
             <button
               className={`sp-theme-btn ${settings.theme === "light" ? "active" : ""}`}
               onClick={() => updateSetting("theme", "light")}
-            >☀️ Light</button>
+            ><i className="fi fi-rr-sun"></i> Light</button>
           </div>
         </SettingRow>
 
-        <SettingRow icon="🔤" label="Font Size" description="Adjust text size throughout the app">
+        <SettingRow icon={<i className="fi fi-rr-text"></i>} label="Font Size" description="Adjust text size throughout the app">
           <div className="sp-font-group">
             {["small", "medium", "large"].map(size => (
               <button
@@ -197,26 +197,26 @@ function SettingsPanel() {
           </div>
         </SettingRow>
 
-        <SettingRow icon="✨" label="Animations" description="Enable smooth transitions and effects">
+        <SettingRow icon={<i className="fi fi-rr-magic-wand"></i>} label="Animations" description="Enable smooth transitions and effects">
           <ToggleSwitch value={settings.animations} onChange={v => updateSetting("animations", v)} />
         </SettingRow>
 
-        <SettingRow icon="📐" label="Compact Mode" description="Reduce spacing for more content">
+        <SettingRow icon={<i className="fi fi-rr-expand"></i>} label="Compact Mode" description="Reduce spacing for more content">
           <ToggleSwitch value={settings.compactMode} onChange={v => updateSetting("compactMode", v)} />
         </SettingRow>
       </Section>
 
       {/* === AI & Chat === */}
       <Section title="AI & Chat">
-        <SettingRow icon="🔔" label="Notifications" description="Get browser notifications for reminders">
+        <SettingRow icon={<i className="fi fi-rr-bell"></i>} label="Notifications" description="Get browser notifications for reminders">
           <ToggleSwitch value={settings.notificationsEnabled} onChange={v => updateSetting("notificationsEnabled", v)} />
         </SettingRow>
 
-        <SettingRow icon="🔊" label="Voice Auto-Play" description="Automatically speak AI responses">
+        <SettingRow icon={<i className="fi fi-rr-volume-up"></i>} label="Voice Auto-Play" description="Automatically speak AI responses">
           <ToggleSwitch value={settings.ttsAutoPlay} onChange={v => updateSetting("ttsAutoPlay", v)} />
         </SettingRow>
 
-        <SettingRow icon="🌍" label="Language" description="Preferred response language">
+        <SettingRow icon={<i className="fi fi-rr-globe"></i>} label="Language" description="Preferred response language">
           <select
             className="sp-select"
             value={settings.language}
@@ -236,16 +236,16 @@ function SettingsPanel() {
 
       {/* === Privacy === */}
       <Section title="Privacy & Data">
-        <SettingRow icon="🗂️" label="User Data Learning" description="Allow AI to learn from your messages">
+        <SettingRow icon={<i className="fi fi-rr-database"></i>} label="User Data Learning" description="Allow AI to learn from your messages">
           <ToggleSwitch value={settings.userDataLearning} onChange={v => updateSetting("userDataLearning", v)} />
         </SettingRow>
-        <SettingRow icon="📊" label="Usage Analytics" description="Help improve the app (anonymous)">
+        <SettingRow icon={<i className="fi fi-rr-stats"></i>} label="Usage Analytics" description="Help improve the app (anonymous)">
           <ToggleSwitch value={settings.usageAnalytics} onChange={v => updateSetting("usageAnalytics", v)} />
         </SettingRow>
       </Section>
 
       {/* === Danger Zone === */}
-      <Section title="⚠ Danger Zone">
+      <Section title={<><i className="fi fi-sr-triangle-warning"></i> Danger Zone</>}>
         <SettingRow icon={<i className="fi fi-sr-trash"></i>} label="Delete Account" description="Permanently delete your account and all data">
           <button className="sp-danger-btn" onClick={() => setShowDeleteAccount(true)}>
             <i className="fi fi-sr-trash"></i> Delete Account
@@ -265,14 +265,14 @@ function SettingsPanel() {
 
       {/* Reset button */}
       <button className="sp-reset-btn" onClick={() => setShowReset(true)}>
-        ↺ Reset All Settings to Default
+        <i className="fi fi-rr-refresh"></i> Reset All Settings to Default
       </button>
 
       {/* Confirm Logout Modal */}
       {showLogout && (
         <div className="sp-confirm-overlay" onClick={() => setShowLogout(false)}>
           <div className="sp-confirm-modal" onClick={e => e.stopPropagation()}>
-            <div className="sp-confirm-icon">👋</div>
+            <div className="sp-confirm-icon"><i className="fi fi-rr-smile"></i></div>
             <h3>Logging out?</h3>
             <p>You'll need to sign in again to access your chats and data.</p>
             <div className="sp-confirm-actions">
@@ -287,7 +287,7 @@ function SettingsPanel() {
       {showReset && (
         <div className="sp-confirm-overlay" onClick={() => setShowReset(false)}>
           <div className="sp-confirm-modal" onClick={e => e.stopPropagation()}>
-            <div className="sp-confirm-icon">⚠️</div>
+            <div className="sp-confirm-icon"><i className="fi fi-rr-triangle-warning"></i></div>
             <h3>Reset Settings?</h3>
             <p>This will restore all settings to their default values.</p>
             <div className="sp-confirm-actions">
@@ -302,7 +302,7 @@ function SettingsPanel() {
       {showDeleteAccount && (
         <div className="sp-confirm-overlay" onClick={() => { setShowDeleteAccount(false); setDeleteError(""); setDeletePassword(""); }}>
           <div className="sp-confirm-modal sp-delete-modal" onClick={e => e.stopPropagation()}>
-            <div className="sp-confirm-icon">☠️</div>
+            <div className="sp-confirm-icon"><i className="fi fi-rr-shield-exclamation" style={{color: '#ef4444'}}></i></div>
             <h3>Delete Your Account?</h3>
             <p>This will <strong>permanently</strong> delete your account, all chats, notes, reminders, and personal data. This action <strong>cannot be undone</strong>.</p>
             <div className="sp-delete-input-group">

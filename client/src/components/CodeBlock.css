@@ -154,3 +154,66 @@
   background: rgba(13, 17, 23, 0.8);
   box-shadow: inset 0 0 0 2px rgba(56, 189, 248, 0.3);
 }
+
+/* ===== INFO BLOCK (Minor version) ===== */
+.infoBlock {
+  display: flex;
+  align-items: flex-start;
+  gap: 16px;
+  background: rgba(99, 102, 241, 0.05);
+  border: 1px solid rgba(99, 102, 241, 0.15);
+  border-radius: 14px;
+  padding: 16px 20px;
+  margin: 16px 0;
+  position: relative;
+  transition: all 0.3s;
+}
+
+.infoBlock:hover {
+  background: rgba(99, 102, 241, 0.08);
+  border-color: rgba(99, 102, 241, 0.3);
+}
+
+.infoBlockIcon {
+  font-size: 20px;
+  color: #a5b4fc;
+  margin-top: 2px;
+}
+
+.infoBlockContent {
+  flex: 1;
+  font-family: inherit;
+  font-size: 14px;
+  line-height: 1.6;
+  color: #cbd5e1;
+  white-space: pre-wrap;
+  text-align: left;
+}
+
+.infoCopyBtn {
+  background: transparent;
+  border: none;
+  color: #64748b;
+  cursor: pointer;
+  font-size: 14px;
+  padding: 4px;
+  opacity: 0.5;
+  transition: all 0.2s;
+}
+
+.infoCopyBtn:hover {
+  opacity: 1;
+  color: #a5b4fc;
+}
+
+/* Light Theme Info Block */
+[data-theme="light"] .infoBlock {
+  background: #f8fafc;
+  border-color: #e2e8f0;
+}
+[data-theme="light"] .infoBlockContent {
+  color: #1e293b;
+}
+[data-theme="light"] .infoBlockIcon {
+  color: #6366f1;
+}
