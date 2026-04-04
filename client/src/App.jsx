@@ -15,18 +15,23 @@ import RemindersPanel from "./components/RemindersPanel";
 import UserDataPanel from "./components/UserDataPanel";
 import SettingsPanel from "./components/SettingsPanel";
 import AdminPanel from "./components/AdminPanel";
+import SplashScreen from "./components/SplashScreen";
+import GlobalNotification from "./components/GlobalNotification";
 import "./App.css";
 
 // ─────────────────────────────────────────────────────────────────────────────
 // 🎤  useVoice — Speech Recognition + TTS hook
 // ─────────────────────────────────────────────────────────────────────────────
 function useVoice({ onTranscript, onAutoSend }) {
-  const [listening,  setListening]  = useState(false);
-  const [supported,  setSupported]  = useState(false);
+  const [listening, setListening] = useState(false);
+  const [supported, setSupported] = useState(false);
   const [ttsEnabled, setTtsEnabled] = useState(true);
   const recognitionRef = useRef(null);
+  const transcriptRef = useRef("");
+  const lastEmittedRef = useRef("");
   const onTranscriptRef = useRef(onTranscript);
   const onAutoSendRef = useRef(onAutoSend);
+  const silenceTimerRef = useRef(null);
 
   useEffect(() => {
     onTranscriptRef.current = onTranscript;
@@ -35,52 +40,125 @@ function useVoice({ onTranscript, onAutoSend }) {
 
   useEffect(() => {
     const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
-    if (!SR) { setSupported(false); return; }
+    if (!SR) {
+      setSupported(false);
+      return;
+    }
     setSupported(true);
+
     const rec = new SR();
-    rec.continuous     = false;
+    rec.continuous = true;
     rec.interimResults = true;
-    rec.lang           = "en-US";
+    rec.lang = "en-US";
+
     rec.onresult = (e) => {
-      let interim = ""; let final = "";
-      for (const result of e.results) {
-        if (result.isFinal) final   += result[0].transcript;
-        else                 interim += result[0].transcript;
+      let interim = "";
+      let final = "";
+
+      for (let i = e.resultIndex; i < e.results.length; ++i) {
+        if (e.results[i].isFinal) {
+          final += e.results[i][0].transcript;
+        } else {
+          interim += e.results[i][0].transcript;
+        }
       }
-      if (onTranscriptRef.current) onTranscriptRef.current(final || interim);
-      if (final.trim() && onAutoSendRef.current) onAutoSendRef.current(final.trim());
+
+      const currentAccumulated = transcriptRef.current + final;
+      const currentEmitted = (currentAccumulated + " " + interim).trim();
+      lastEmittedRef.current = currentEmitted;
+      
+      if (final) {
+        transcriptRef.current += final;
+        if (silenceTimerRef.current) clearTimeout(silenceTimerRef.current);
+        silenceTimerRef.current = setTimeout(() => {
+          if (onAutoSendRef.current && transcriptRef.current.trim()) {
+            const textToSend = transcriptRef.current.trim();
+            transcriptRef.current = ""; 
+            lastEmittedRef.current = ""; // Prevent double fire in onend
+            onAutoSendRef.current(textToSend);
+            if (recognitionRef.current) recognitionRef.current.stop(); // Stop mic to avoid hearing itself!
+          }
+        }, 2000);
+      }
+
+      if (onTranscriptRef.current) {
+        onTranscriptRef.current(currentEmitted);
+      }
     };
-    rec.onend  = () => setListening(false);
-    rec.onerror = (e) => { console.warn("SpeechRecognition error:", e.error); setListening(false); };
+
+    rec.onend = () => {
+      setListening(false);
+      if (silenceTimerRef.current) {
+        clearTimeout(silenceTimerRef.current);
+        silenceTimerRef.current = null;
+      }
+      
+      // If we stop and have text that wasn't already sent by the timer, send it now
+      if (lastEmittedRef.current.trim()) {
+        const textToSend = lastEmittedRef.current.trim();
+        transcriptRef.current = "";
+        lastEmittedRef.current = "";
+        onAutoSendRef.current(textToSend);
+      }
+    };
+
+    rec.onerror = (e) => {
+      console.warn("SpeechRecognition error:", e.error);
+      setListening(false);
+    };
+
     recognitionRef.current = rec;
-  }, []); // eslint-disable-line
+    return () => {
+      if (silenceTimerRef.current) clearTimeout(silenceTimerRef.current);
+      if (recognitionRef.current) {
+        lastEmittedRef.current = "";
+        recognitionRef.current.stop();
+      }
+    };
+  }, []);
 
   const toggleMic = useCallback(() => {
     const rec = recognitionRef.current;
     if (!rec) return;
-    if (listening) { rec.stop(); setListening(false); }
-    else { try { rec.start(); setListening(true); } catch (err) { console.warn("Mic start error:", err); } }
+    if (listening) {
+      rec.stop();
+    } else {
+      transcriptRef.current = "";
+      lastEmittedRef.current = "";
+      try {
+        rec.start();
+        setListening(true);
+      } catch (err) {
+        console.warn("Mic start error:", err);
+      }
+    }
   }, [listening]);
 
   const speak = useCallback((text) => {
     if (!ttsEnabled) return;
     if (!window.speechSynthesis) return;
     window.speechSynthesis.cancel();
+    
     const clean = text
+      .replace(/<think>[\s\S]*?<\/think>/g, "") 
       .replace(/```[\s\S]*?```/g, "code block")
       .replace(/`([^`]+)`/g, "$1")
       .replace(/\*\*(.+?)\*\*/g, "$1")
       .replace(/\*(.+?)\*/g, "$1")
       .replace(/#{1,6}\s/g, "")
       .replace(/\[(.+?)\]\(.+?\)/g, "$1")
+      .trim()
       .slice(0, 600);
-    const utt = new SpeechSynthesisUtterance(clean);
+
+    if (!clean) return;
+
     const voices = window.speechSynthesis.getVoices();
+    const utt = new SpeechSynthesisUtterance(clean);
     const femaleVoice = voices.find(v =>
       v.name.toLowerCase().includes("female") || v.name.toLowerCase().includes("zira") ||
-      v.name.toLowerCase().includes("samantha") || v.name.toLowerCase().includes("google uk english female") ||
-      v.name.toLowerCase().includes("en-gb")
+      v.name.toLowerCase().includes("samantha") || v.name.toLowerCase().includes("google uk english female")
     ) || voices[0];
+    
     utt.voice = femaleVoice;
     utt.rate = 1.05; utt.pitch = 1; utt.volume = 1;
     window.speechSynthesis.speak(utt);
@@ -108,14 +186,6 @@ const ChatMarkdown = ({ content }) => (
         );
         return <CodeBlock className={className}>{children}</CodeBlock>;
       },
-      p:          ({ children }) => <p style={{ margin: "0 0 10px", textAlign: "left" }}>{children}</p>,
-      ul:         ({ children }) => <ul style={{ paddingLeft: "20px", margin: "0 0 10px", textAlign: "left" }}>{children}</ul>,
-      ol:         ({ children }) => <ol style={{ paddingLeft: "20px", margin: "0 0 10px", textAlign: "left" }}>{children}</ol>,
-      li:         ({ children }) => <li style={{ marginBottom: "4px", textAlign: "left" }}>{children}</li>,
-      h1:         ({ children }) => <h1 style={{ fontSize: "20px", fontWeight: 700, color: "#f1f5f9", margin: "16px 0 8px", textAlign: "left" }}>{children}</h1>,
-      h2:         ({ children }) => <h2 style={{ fontSize: "17px", fontWeight: 600, color: "#e2e8f0", margin: "14px 0 6px", textAlign: "left" }}>{children}</h2>,
-      h3:         ({ children }) => <h3 style={{ fontSize: "15px", fontWeight: 600, color: "#cbd5e1", margin: "12px 0 4px", textAlign: "left" }}>{children}</h3>,
-      strong:     ({ children }) => <strong style={{ color: "#f1f5f9", fontWeight: 600 }}>{children}</strong>,
       blockquote: ({ children }) => (
         <blockquote style={{
           borderLeft: "3px solid #6366f1", background: "rgba(99,102,241,0.08)",
@@ -123,6 +193,14 @@ const ChatMarkdown = ({ content }) => (
           color: "#94a3b8", fontStyle: "italic", textAlign: "left",
         }}>{children}</blockquote>
       ),
+      p: ({ children }) => <p style={{ margin: "0 0 10px", textAlign: "left" }}>{children}</p>,
+      ul: ({ children }) => <ul style={{ paddingLeft: "20px", margin: "0 0 10px", textAlign: "left" }}>{children}</ul>,
+      ol: ({ children }) => <ol style={{ paddingLeft: "20px", margin: "0 0 10px", textAlign: "left" }}>{children}</ol>,
+      li: ({ children }) => <li style={{ marginBottom: "4px", textAlign: "left" }}>{children}</li>,
+      h1: ({ children }) => <h1 style={{ fontSize: "20px", fontWeight: 700, color: "#f1f5f9", margin: "16px 0 8px", textAlign: "left" }}>{children}</h1>,
+      h2: ({ children }) => <h2 style={{ fontSize: "17px", fontWeight: 600, color: "#e2e8f0", margin: "14px 0 6px", textAlign: "left" }}>{children}</h2>,
+      h3: ({ children }) => <h3 style={{ fontSize: "15px", fontWeight: 600, color: "#cbd5e1", margin: "12px 0 4px", textAlign: "left" }}>{children}</h3>,
+      strong: ({ children }) => <strong style={{ color: "#f1f5f9", fontWeight: 600 }}>{children}</strong>,
       table: ({ children }) => (
         <div style={{ overflowX: "auto", margin: "14px 0" }}>
           <table style={{ width: "100%", borderCollapse: "collapse", fontSize: "13px" }}>{children}</table>
@@ -139,6 +217,55 @@ const ChatMarkdown = ({ content }) => (
     {content}
   </ReactMarkdown>
 );
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Reasoning UI
+// ─────────────────────────────────────────────────────────────────────────────
+function ThinkingAccordion({ text }) {
+  const [open, setOpen] = useState(false);
+  return (
+    <div className="thinking-accordion">
+      <div className="thinking-header" onClick={() => setOpen(!open)}>
+        <span className="thinking-icon">🧠</span>
+        <span className="thinking-title">AI Thinking Process</span>
+        <span className="thinking-toggle">{open ? "▼" : "▶"}</span>
+      </div>
+      {open && (
+        <div className="thinking-body">
+          <ChatMarkdown content={text} />
+        </div>
+      )}
+    </div>
+  );
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// AI Message Parser
+// ─────────────────────────────────────────────────────────────────────────────
+function ParsedAIMessage({ content }) {
+  // If the content doesn't have <think> tags, just render it normally
+  if (!content.includes("<think>")) {
+    return <ChatMarkdown content={content} />;
+  }
+
+  // Use Regex to split out the <think> blocks
+  // format: [text before, thinking content, text after]
+  const parts = content.split(/<think>\n?([\s\S]*?)\n?<\/think>/);
+
+  return (
+    <>
+      {parts.map((part, index) => {
+        if (!part) return null;
+        // The regex split puts the captured <think> content in odd-numbered indices
+        if (index % 2 === 1) {
+          return <ThinkingAccordion key={index} text={part.trim()} />;
+        }
+        // Normal text content is in even indices
+        return <ChatMarkdown key={index} content={part} />;
+      })}
+    </>
+  );
+}
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Typing animation
@@ -180,11 +307,8 @@ function UserMessage({ content, onResend }) {
     </div>
   );
   return (
-    <div className="userMsgWrapper">
+    <div className="userMsgWrapper" onDoubleClick={() => setEditing(true)}>
       <div className="userMsg">{content}</div>
-      <div className="userMsgActions">
-        <button className="userEditBtn" onClick={() => setEditing(true)}>✏ Edit</button>
-      </div>
     </div>
   );
 }
@@ -192,29 +316,104 @@ function UserMessage({ content, onResend }) {
 // ─────────────────────────────────────────────────────────────────────────────
 // App
 // ─────────────────────────────────────────────────────────────────────────────
+// Model Selector Component
+// ─────────────────────────────────────────────────────────────────────────────
+const NVIDIA_LOGO = "https://cdn.simpleicons.org/nvidia/76B900";
+const OLLAMA_LOGO = "https://ollama.com/public/ollama.png";
+
+function ModelSelector({ value, onChange }) {
+  const [isOpen, setIsOpen] = useState(false);
+  const containerRef = useRef(null);
+
+  useEffect(() => {
+    const handleClickOutside = (e) => {
+      if (containerRef.current && !containerRef.current.contains(e.target)) {
+        setIsOpen(false);
+      }
+    };
+    document.addEventListener("mousedown", handleClickOutside);
+    return () => document.removeEventListener("mousedown", handleClickOutside);
+  }, []);
+
+  const options = [
+    { id: "nvidia", name: "Nvidia GLM-5", logo: NVIDIA_LOGO, desc: "⚡ Fast & Smart" },
+    { id: "ollama", name: "Local Ollama", logo: OLLAMA_LOGO, desc: "🦙 Privacy First" },
+  ];
+
+  const current = options.find(o => o.id === value) || options[0];
+
+  return (
+    <div className="model-selector-container" ref={containerRef}>
+      <div className="model-selector-trigger" onClick={() => setIsOpen(!isOpen)}>
+        <img src={current.logo} alt="" className="model-logo" />
+        <span>{current.name}</span>
+        <span style={{ fontSize: "10px", opacity: 0.6 }}>{isOpen ? "▲" : "▼"}</span>
+      </div>
+
+      {isOpen && (
+        <div className="model-selector-options">
+          {options.map(opt => (
+            <div 
+              key={opt.id} 
+              className={`model-option ${value === opt.id ? "active" : ""}`}
+              onClick={() => { onChange(opt.id); setIsOpen(false); }}
+            >
+              <img src={opt.logo} alt="" className="model-logo" />
+              <div style={{ display: "flex", flexDirection: "column" }}>
+                <span style={{ fontWeight: "700" }}>{opt.name}</span>
+                <span style={{ fontSize: "10px", opacity: 0.5 }}>{opt.desc}</span>
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
 function App() {
   const { isAuthenticated, loading: authLoading, user } = useAuth();
   const { settings } = useSettings();
-  
-  const [activeTab, setActiveTab]                 = useState("chat");
-  const [message, setMessage]                     = useState("");
-  const [conversations, setConversations]         = useState([]);
-  const [conversationId, setConversationId]       = useState(null);
-  const [displayedMessages, setDisplayedMessages] = useState([]);
-  const [msgMeta, setMsgMeta]                     = useState({});
-  const [loading, setLoading]                     = useState(false);
-  const [sidebarOpen, setSidebarOpen]             = useState(false);
-  const [typingId, setTypingId]                   = useState(null);
-  const [notesHistory, setNotesHistory]           = useState([]);
-  const [activeNotesIndex, setActiveNotesIndex]   = useState(null);
-  const [loadedNote, setLoadedNote]               = useState(null);
 
-  const bottomRef        = useRef(null);
+  const [activeTab, setActiveTab] = useState("chat");
+  const [message, setMessage] = useState("");
+  const [apiProvider, setApiProvider] = useState("nvidia");
+  const [conversations, setConversations] = useState([]);
+  const [conversationId, setConversationId] = useState(null);
+  const [displayedMessages, setDisplayedMessages] = useState([]);
+  const [msgMeta, setMsgMeta] = useState({});
+  const [loading, setLoading] = useState(false);
+  const [sidebarOpen, setSidebarOpen] = useState(false);
+  const [typingId, setTypingId] = useState(null);
+  const [notesHistory, setNotesHistory] = useState([]);
+  const [activeNotesIndex, setActiveNotesIndex] = useState(null);
+  const [loadedNote, setLoadedNote] = useState(null);
+  const [showSplash, setShowSplash] = useState(true);
+
+  const bottomRef = useRef(null);
   const handleTypingDone = useCallback(() => setTypingId(null), []);
 
   const voice = useVoice({
-    onTranscript: (t) => setMessage(t),
-    onAutoSend:   (t) => doSend(t),
+    onTranscript: (t) => {
+      setMessage(curr => {
+        const base = curr.includes("🎤") ? curr.split("🎤")[0] : curr;
+        return (base.trim() ? base.trim() + " " : "") + "🎤 " + t;
+      });
+    },
+    onAutoSend: (t) => {
+      if (!t?.trim()) {
+        setMessage(curr => curr.includes("🎤") ? curr.split("🎤")[0] : curr);
+        return;
+      }
+      const base = message.includes("🎤") ? message.split("🎤")[0] : message;
+      const fullMsg = (base.trim() ? base.trim() + " " : "") + t.trim();
+      
+      if (fullMsg.trim()) {
+        doSend(fullMsg.trim());
+      }
+      setMessage(""); // Clear completely
+    }
   });
 
   useEffect(() => {
@@ -227,14 +426,9 @@ function App() {
     bottomRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [displayedMessages, loading]);
 
-  // Auto-open sidebar on large screens
-  useEffect(() => {
-    if (window.innerWidth > 1100) setSidebarOpen(true);
-  }, []);
-
   const handleSelectChat = async (conv) => {
     try {
-      const res  = await getConversation(conv._id);
+      const res = await getConversation(conv._id);
       const full = res.data;
       setConversationId(full._id);
       setDisplayedMessages(full.messages.map((m, i) => ({ ...m, _displayId: `${full._id}_${i}`, _timestamp: m.timestamp || m.createdAt || null })));
@@ -275,31 +469,33 @@ function App() {
     setMessage("");
     const now = Date.now();
     const userDisplayId = `user_${now}`;
-    const aiDisplayId   = `ai_${now + 1}`;
+    const aiDisplayId = `ai_${now + 1}`;
     setDisplayedMessages((prev) => [...prev, { role: "user", content: text, _displayId: userDisplayId, _timestamp: now }]);
     try {
-      const res = await sendMessage(text, resolvedConvId);
-      const { conversationId: newConvId, aiMessage, searchResults, images, searchQuery, modelUsed, weather, news } = res.data;
+      const res = await sendMessage(text, resolvedConvId, apiProvider);
+      const { conversationId: newConvId, aiMessage, searchResults, images, searchQuery, modelUsed, apiProvider: returnedApiProvider, weather, news } = res.data;
       setConversationId(newConvId);
       setDisplayedMessages((prev) => [...prev, { role: "ai", content: aiMessage, _displayId: aiDisplayId, _timestamp: Date.now() }]);
       setTypingId(aiDisplayId);
       setMsgMeta((prev) => ({
         ...prev,
-        [aiDisplayId]: { 
-          searchResults: searchResults || [], 
-          images: images || [], 
-          searchQuery, 
+        [aiDisplayId]: {
+          searchResults: searchResults || [],
+          images: images || [],
+          searchQuery,
           modelUsed,
+          apiProvider: returnedApiProvider || apiProvider,
           weather: weather || null,
           news: news || []
         },
       }));
-      setTimeout(() => voice.speak(aiMessage), 400);
+      const speakableText = aiMessage.replace(/<think>[\s\S]*?<\/think>/g, "").trim();
+      setTimeout(() => voice.speak(speakableText), 400);
       const listRes = await getChats();
       setConversations(listRes.data);
     } catch (err) { console.error(err); }
     setLoading(false);
-  }, [conversationId, loading, voice]);
+  }, [conversationId, loading, voice, apiProvider]);
 
   const handleSend = () => { if (message.trim()) doSend(message.trim()); };
 
@@ -352,10 +548,8 @@ function App() {
     );
   }
 
-  if (!isAuthenticated) return <AuthPage />;
-
   // ─────────────────────────────────────────────────────────────────────────
-  return (
+  const appContent = !isAuthenticated ? <AuthPage /> : (
     <div className={`app ${settings.compactMode ? "compact" : ""} ${settings.animations ? "" : "no-animations"}`}>
       <Sidebar
         conversations={conversations}
@@ -382,13 +576,14 @@ function App() {
         <div className="topbar">
           <button className="menuBtn" onClick={() => setSidebarOpen(o => !o)}>☰</button>
           <h2 className="topbar-title">
-            {activeTab === "chat"      && "Chat"}
-            {activeTab === "notes"     && "Notes"}
+            {activeTab === "chat" && "Chat"}
+            {activeTab === "notes" && "Notes"}
             {activeTab === "reminders" && "Reminders"}
-            {activeTab === "userdata"  && "My Data"}
-            {activeTab === "settings"  && "Settings"}
+            {activeTab === "userdata" && "My Data"}
+            {activeTab === "settings" && "Settings"}
           </h2>
-          <div className="topbar-right">
+          <div className="topbar-right" style={{ display: "flex", alignItems: "center", gap: "10px" }}>
+            <ModelSelector value={apiProvider} onChange={setApiProvider} />
             <span className="topbar-user">👤 {user?.name}</span>
           </div>
         </div>
@@ -426,15 +621,10 @@ function App() {
                       <>
                         <div className="aiRow">
                           <div style={{ display: "flex", flexDirection: "column", maxWidth: "75%", minWidth: 0 }}>
-                            {msgMeta[aiM._displayId]?.modelUsed && (
-                              <span className={`modelBadge ${msgMeta[aiM._displayId].modelUsed}`}>
-                                {msgMeta[aiM._displayId].modelUsed === "code" ? "⚡ CodeLlama" : "💬 Llama3"}
-                              </span>
-                            )}
                             <div className="aiMsg" style={{ maxWidth: "100%" }}>
                               {aiM._displayId === typingId
                                 ? <TypingMessage text={aiM.content} onDone={handleTypingDone} />
-                                : <ChatMarkdown content={aiM.content} />}
+                                : <ParsedAIMessage content={aiM.content} />}
                             </div>
                             {aiM._timestamp && <span className="msg-timestamp">{formatMsgTime(aiM._timestamp)}</span>}
                           </div>
@@ -479,7 +669,7 @@ function App() {
                 {loading && (
                   <div className="aiRow">
                     <div className="aiMsg">
-                      <div className="dots"><span/><span/><span/></div>
+                      <div className="dots"><span /><span /><span /></div>
                     </div>
                   </div>
                 )}
@@ -506,11 +696,20 @@ function App() {
                 />
                 {voice.supported && (
                   <button
-                    className={`micBtn ${voice.listening ? "recording" : ""}`}
+                    className={`micBtn ${voice.listening ? "recording" : ""} ${loading || typingId ? "processing" : ""}`}
                     onClick={voice.toggleMic}
-                    disabled={loading}
+                    disabled={(loading || typingId) && !voice.listening}
                     title={voice.listening ? "Stop recording" : "Start voice input"}
-                  >🎤</button>
+                  >
+                    {((loading || typingId) && !voice.listening) ? (
+                      <div className="mic-loader" />
+                    ) : (
+                      <svg viewBox="0 0 24 24" width="20" height="20" fill="currentColor">
+                        <path d="M12 14c1.66 0 3-1.34 3-3V5c0-1.66-1.34-3-3-3S9 3.34 9 5v6c0 1.66 1.34 3 3 3z"/>
+                        <path d="M17 11c0 2.76-2.24 5-5 5s-5-2.24-5-5H5c0 3.53 2.61 6.43 6 6.92V21h2v-3.08c3.39-.49 6-3.39 6-6.92h-2z"/>
+                      </svg>
+                    )}
+                  </button>
                 )}
                 <button className="button" onClick={handleSend} disabled={loading || voice.listening}>
                   Send
@@ -538,6 +737,14 @@ function App() {
         </div>
       </div>
     </div>
+  );
+
+  return (
+    <>
+      {showSplash && <SplashScreen onComplete={() => setShowSplash(false)} />}
+      <GlobalNotification />
+      {appContent}
+    </>
   );
 }
 

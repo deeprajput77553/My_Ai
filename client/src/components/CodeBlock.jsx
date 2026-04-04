@@ -18,7 +18,30 @@ const EXTENSIONS = {
   yml: "yaml",      xml: "xml",  txt: "txt",
 };
 
-const getExt = (lang) => EXTENSIONS[lang.toLowerCase()] || "txt";
+const getFilename = (code, lang) => {
+  const lines = code.split("\n");
+  const firstLine = lines[0] || "";
+  // Look for // filename: example.js or # filename: example.py
+  const match = firstLine.match(/(?:\/\/|#|--) filename:\s*([\w.]+)/i);
+  if (match) return match[1];
+  
+  const ext = getExt(lang, code);
+  return `code_snippet.${ext}`;
+};
+
+const getExt = (lang, code = "") => {
+  const l = (lang || "").toLowerCase();
+  if (l && l !== "txt") return EXTENSIONS[l] || "txt";
+  
+  // Sniff code content
+  const c = code.toLowerCase();
+  if (c.includes("import ") || c.includes("def ") || c.includes("print(")) return "py";
+  if (c.includes("const ") || c.includes("let ") || c.includes("function ") || c.includes("console.log")) return "js";
+  if (c.includes("<html>") || c.includes("<!doctype") || c.includes("</div>")) return "html";
+  if (c.includes("{") && c.includes(": ") && (c.includes("color:") || c.includes("margin:"))) return "css";
+  if (c.includes("public class ") || c.includes("system.out.println")) return "java";
+  return "txt";
+};
 
 function CodeBlock({ className, children }) {
   const [copied, setCopied]   = useState(false);
@@ -26,7 +49,8 @@ function CodeBlock({ className, children }) {
   const [code, setCode]       = useState(String(children).replace(/\n$/, ""));
 
   const lang = getLang(className);
-  const ext  = getExt(lang);
+  const filename = getFilename(code, lang);
+  const ext = filename.split(".").pop() || "txt";
 
   const handleCopy = async () => {
     try {
@@ -51,7 +75,7 @@ function CodeBlock({ className, children }) {
     const url  = URL.createObjectURL(blob);
     const a    = document.createElement("a");
     a.href     = url;
-    a.download = `code.${ext}`;
+    a.download = filename;
     a.click();
     URL.revokeObjectURL(url);
   };
@@ -61,10 +85,8 @@ function CodeBlock({ className, children }) {
       {/* Header bar */}
       <div className="codeBlockHeader">
         <div className="codeLang">
-          <span className="codeDot red" />
-          <span className="codeDot yellow" />
-          <span className="codeDot green" />
-          <span className="codeLangLabel">{lang}</span>
+          <i className="fi fi-sr-file-code" style={{ color: "#38bdf8", fontSize: "16px" }} />
+          <span className="codeLangLabel">{filename}</span>
         </div>
         <div className="codeActions">
           {/* Edit toggle */}
@@ -73,25 +95,26 @@ function CodeBlock({ className, children }) {
             onClick={() => setEditing((p) => !p)}
             title={editing ? "Done editing" : "Edit code"}
           >
-            {editing ? "✓ Done" : "✏ Edit"}
+            <i className={editing ? "fi fi-sr-check" : "fi fi-sr-pencil"} />
+            <span>{editing ? "Done" : "Edit"}</span>
           </button>
 
-          {/* Copy */}
           <button
             className="codeBtn"
             onClick={handleCopy}
             title="Copy code"
           >
-            {copied ? "✓ Copied" : "⧉ Copy"}
+            <i className={copied ? "fi fi-sr-check" : "fi fi-sr-copy"} />
+            <span>{copied ? "Copied" : "Copy"}</span>
           </button>
 
-          {/* Download */}
           <button
             className="codeBtn"
             onClick={handleDownload}
-            title={`Download as .${ext}`}
+            title={`Download as ${filename}`}
           >
-            ⬇ .{ext}
+            <i className="fi fi-sr-download" />
+            <span>Download</span>
           </button>
         </div>
       </div>

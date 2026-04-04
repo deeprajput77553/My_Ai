@@ -586,55 +586,78 @@ html, body {
 
 /* ===== MIC BUTTON ===== */
 .micBtn {
-  width: 44px;
-  height: 44px;
+  width: 42px;
+  height: 42px;
   border-radius: 50%;
-  border: 1px solid rgba(255,255,255,0.08);
-  background: rgba(255,255,255,0.04);
-  color: var(--text-secondary, #94a3b8);
-  font-size: 18px;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  background: rgba(255, 255, 255, 0.03);
+  color: #94a3b8;
   cursor: pointer;
   display: flex;
   align-items: center;
   justify-content: center;
   flex-shrink: 0;
-  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  transition: all 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275);
   position: relative;
+  overflow: visible;
+}
+.micBtn svg {
+  transition: transform 0.2s;
 }
 .micBtn:hover:not(:disabled) {
-  background: rgba(99,102,241,0.12);
-  color: #a5b4fc;
-  transform: scale(1.1);
-  border-color: rgba(99,102,241,0.3);
-  box-shadow: 0 4px 16px rgba(99,102,241,0.2);
+  background: rgba(99, 102, 241, 0.12);
+  color: #6366f1;
+  transform: translateY(-2px);
+  border-color: rgba(99, 102, 241, 0.3);
 }
-.micBtn:disabled { opacity: 0.35; cursor: not-allowed; }
 .micBtn.recording {
-  background: rgba(239,68,68,0.12);
-  color: #ef4444;
-  border: 1px solid rgba(239,68,68,0.4);
-  box-shadow: 0 0 20px rgba(239,68,68,0.15);
+  background: rgba(239, 68, 68, 0.12);
+  color: #f87171;
+  border-color: rgba(239, 68, 68, 0.4);
+  box-shadow: 0 0 15px rgba(239, 68, 68, 0.2);
+}
+.micBtn.recording svg {
+  transform: scale(1.1);
+  animation: micScale 1s ease-in-out infinite;
+}
+@keyframes micScale {
+  0%, 100% { transform: scale(1.1); }
+  50%      { transform: scale(0.9); }
 }
 .micBtn.recording::before {
   content: "";
   position: absolute;
-  inset: -5px;
+  inset: -4px;
   border-radius: 50%;
-  border: 2px solid rgba(239,68,68,0.4);
+  border: 2px solid rgba(239, 68, 68, 0.3);
   animation: micRing 1.5s ease-out infinite;
 }
-.micBtn.recording::after {
-  content: "";
-  position: absolute;
-  inset: -10px;
+.micBtn.processing {
+  background: rgba(99, 102, 241, 0.15);
+  border-color: rgba(99, 102, 241, 0.5);
+  color: #6366f1;
+  animation: pulseProcessing 2s ease-in-out infinite;
+}
+@keyframes pulseProcessing {
+  0%, 100% { box-shadow: 0 0 10px rgba(99, 102, 241, 0.2); }
+  50%      { box-shadow: 0 0 25px rgba(99, 102, 241, 0.4); }
+}
+.mic-loader {
+  width: 18px;
+  height: 18px;
+  border: 2px solid rgba(99, 102, 241, 0.3);
+  border-top-color: #6366f1;
   border-radius: 50%;
-  border: 2px solid rgba(239,68,68,0.2);
-  animation: micRing 1.5s ease-out infinite 0.5s;
+  animation: spin 0.8s linear infinite;
+}
+@keyframes spin {
+  to { transform: rotate(360deg); }
 }
 @keyframes micRing {
-  0% { transform: scale(1); opacity: 1; }
-  100% { transform: scale(1.6); opacity: 0; }
+  0% { transform: scale(1); opacity: 0.8; }
+  100% { transform: scale(1.5); opacity: 0; }
 }
+.micBtn:disabled:not(.recording) { opacity: 0.3; cursor: not-allowed; }
 
 /* ===== TTS BUTTON ===== */
 .ttsBtn {
@@ -781,4 +804,152 @@ html, body {
 ::selection {
   background: rgba(99,102,241,0.3);
   color: #e2e8f0;
+}
+
+/* ─────────────────────────────────────────────────────────────────────────────
+ * AI Thinking Accordion
+ * ───────────────────────────────────────────────────────────────────────────── */
+.thinking-accordion {
+  margin: 10px 0;
+  border: 1px solid rgba(255, 255, 255, 0.06);
+  border-radius: 8px;
+  background: rgba(15, 23, 42, 0.4);
+  overflow: hidden;
+}
+
+.thinking-header {
+  display: flex;
+  align-items: center;
+  padding: 8px 12px;
+  cursor: pointer;
+  background: rgba(255, 255, 255, 0.03);
+  transition: background 0.2s;
+  user-select: none;
+}
+
+.thinking-header:hover {
+  background: rgba(255, 255, 255, 0.08);
+}
+
+.thinking-icon {
+  margin-right: 8px;
+  font-size: 14px;
+}
+
+.thinking-title {
+  font-size: 13px;
+  font-weight: 600;
+  color: #94a3b8;
+  flex: 1;
+}
+
+.thinking-toggle {
+  font-size: 10px;
+  color: #64748b;
+  transition: transform 0.2s;
+}
+
+.thinking-body {
+  padding: 12px;
+  border-top: 1px solid rgba(255, 255, 255, 0.04);
+  font-size: 13px;
+  color: #94a3b8;
+  background: rgba(2, 6, 23, 0.3);
+  font-style: italic;
+}
+
+.thinking-body p:last-child {
+  margin-bottom: 0;
+}
+
+/* ─────────────────────────────────────────────────────────────────────────────
+ * Custom Model Selector Dropdown
+ * ───────────────────────────────────────────────────────────────────────────── */
+.model-selector-container {
+  position: relative;
+  user-select: none;
+}
+
+.model-selector-trigger {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  background: rgba(15, 23, 42, 0.8);
+  backdrop-filter: blur(8px);
+  color: #cbd5e1;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 10px;
+  padding: 6px 12px;
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.2);
+  min-width: 160px;
+}
+
+.model-selector-trigger:hover {
+  background: rgba(30, 41, 59, 0.9);
+  border-color: rgba(56, 189, 248, 0.3);
+  transform: translateY(-1px);
+  box-shadow: 0 6px 16px rgba(0, 0, 0, 0.3);
+}
+
+.model-logo {
+  width: 16px;
+  height: 16px;
+  object-fit: contain;
+}
+
+.model-selector-options {
+  position: absolute;
+  top: calc(100% + 8px);
+  right: 0;
+  width: 200px;
+  background: rgba(15, 23, 42, 0.95);
+  backdrop-filter: blur(12px);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 12px;
+  padding: 6px;
+  z-index: 1000;
+  box-shadow: 0 10px 25px rgba(0, 0, 0, 0.4);
+  animation: dropdownFadeIn 0.2s ease-out;
+}
+
+@keyframes dropdownFadeIn {
+  from { opacity: 0; transform: translateY(-10px) scale(0.95); }
+  to { opacity: 1; transform: translateY(0) scale(1); }
+}
+
+.model-option {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 10px 12px;
+  border-radius: 8px;
+  cursor: pointer;
+  transition: all 0.2s;
+  color: #94a3b8;
+  font-size: 13px;
+  font-weight: 500;
+}
+
+.model-option:hover {
+  background: rgba(255, 255, 255, 0.05);
+  color: #f8fafc;
+}
+
+.model-option.active {
+  background: rgba(56, 189, 248, 0.1);
+  color: #38bdf8;
+  border: 1px solid rgba(56, 189, 248, 0.2);
+}
+
+.model-option .model-logo {
+  filter: grayscale(0.2);
+  transition: filter 0.2s;
+}
+
+.model-option:hover .model-logo {
+  filter: grayscale(0);
 }

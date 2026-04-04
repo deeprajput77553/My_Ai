@@ -8,19 +8,24 @@ import { extractUserDataFromMessage, extractRemindersFromMessage } from "./userD
 import UserData from "../models/UserData.js";
 
 // ── System Prompts ────────────────────────────────────────────────────────────
-const CHAT_SYSTEM = `You are a smart, friendly AI assistant. Be concise and helpful.
-
+const CHAT_SYSTEM = `You are a smart, efficient AI assistant.
+ 
 Rules:
-- Keep answers SHORT and focused unless the user explicitly asks for detail
-- Use bullet points only when there are 3+ items to list
-- For simple questions, 1-3 sentences is ideal
-- Never pad answers or repeat yourself
-- Match the user's tone: casual → casual, technical → precise
-- Always reply in the language the user wrote in`;
+- Address the user as "Sir" or "Ma'am" respectfully (infer from their name).
+- Be factual and objective. If search results are provided, prioritize that information.
+- Do NOT give generic "AI responsibility" refusals for famous public figures or common facts. 
+- Match the user's tone: casual → friendly, technical → precise.
+- For simple questions, 1-3 sentences is ideal.
+- Always reply in the same language as the user.`;
 
-const CODE_SYSTEM = `You are an expert software engineer. Write clean, working code with brief explanations.
-
+const CODE_SYSTEM = `You are an expert software engineer.
+ 
 Rules:
+- Address the user as "Sir" or "Ma'am" respectfully.
+- EVERY code block MUST start with a filename comment on the first line. 
+  Example: // filename: app.js OR # filename: script.py
+- Use proper markdown code blocks with language tags (e.g. \`\`\`python)
+
 - Complete, production-ready code only — no placeholders
 - Short explanation of what it does and why
 - Include error handling
@@ -67,6 +72,8 @@ const SEARCH_KEYWORDS = [
   "when did", "recent", "just happened", "announced", "released",
   "president", "prime minister", "ceo of", "founded", "located in",
   "movie", "season", "episode", "release date", "schedule",
+  "search for", "find on", "tell me about", "wikipedia", "duckduckgo", "google",
+  "biography", "details on", "history of"
 ];
 const needsWebSearch = (msg) => {
   const lower = msg.toLowerCase();
@@ -76,7 +83,7 @@ const needsWebSearch = (msg) => {
 // ── Send Message ──────────────────────────────────────────────────────────────
 export const sendMessage = async (req, res) => {
   try {
-    const { message, conversationId } = req.body;
+    const { message, conversationId, apiProvider } = req.body;
     const userId = req.userId;
 
     const modelType    = isCodeQuestion(message) ? "code" : "chat";
@@ -121,7 +128,7 @@ export const sendMessage = async (req, res) => {
     let newsData    = [];
     let searchResults = [];
     let images      = [];
-    let searchQuery = "";
+    let searchQuery = message.replace(/search for|find on|on (duckduckgo|google|wikipedia)/gi, "").trim().slice(0, 100);
 
     if (weatherQuery) {
       // Real weather from wttr.in
@@ -198,7 +205,7 @@ export const sendMessage = async (req, res) => {
 
     aiPrompt += `User: ${message}\nAssistant:`;
 
-    const aiResponse = await generateResponse(aiPrompt, modelType);
+    const aiResponse = await generateResponse(aiPrompt, modelType, { provider: apiProvider });
 
     // Save conversation
     conversation.messages.push({ role: "user", content: message });
@@ -215,6 +222,7 @@ export const sendMessage = async (req, res) => {
       userMessage:    message,
       aiMessage:      aiResponse,
       modelUsed:      modelType,
+      apiProvider:    apiProvider || "nvidia",
       searchResults,
       images,
       searchQuery,

@@ -228,14 +228,30 @@
 .rp-due.overdue     { color: #ef4444; }
 .rp-due.urgent-text { color: #f59e0b; }
 
-.rp-days-badge {
-  padding: 2px 9px; border-radius: 20px;
-  font-size: 10px; font-weight: 700;
+.rp-countdown-badge {
+  padding: 3px 10px; border-radius: 20px;
+  font-size: 11px; font-weight: 700;
+  display: inline-flex; align-items: center; gap: 4px;
   background: rgba(255,255,255,0.06); color: #94a3b8;
+  font-variant-numeric: tabular-nums;
+  letter-spacing: 0.02em;
 }
-.rp-days-badge.today { background: rgba(239,68,68,0.12); color: #f87171; animation: urgencyPulse 2s ease-in-out infinite; }
-.rp-days-badge.soon  { background: rgba(245,158,11,0.12); color: #fbbf24; }
-.rp-days-badge.past  { background: rgba(239,68,68,0.10); color: #f87171; }
+.rp-countdown-badge.normal { background: rgba(56,189,248,0.1); color: #7dd3fc; }
+.rp-countdown-badge.soon { background: rgba(245,158,11,0.12); color: #fbbf24; }
+.rp-countdown-badge.today { background: rgba(239,68,68,0.12); color: #f87171; }
+.rp-countdown-badge.critical { 
+  background: rgba(239,68,68,0.2); color: #fca5a5; 
+  box-shadow: 0 0 10px rgba(239,68,68,0.3);
+  text-shadow: 0 0 5px rgba(239,68,68,0.5);
+}
+.rp-countdown-badge.past { background: rgba(0,0,0,0.2); color: #64748b; text-decoration: line-through; }
+
+.countdown-icon { font-size: 11px; }
+.countdown-icon.pulse { animation: countPulse 1s ease-in-out infinite alternate; }
+@keyframes countPulse {
+  0% { transform: scale(1); filter: drop-shadow(0 0 2px #ef4444); }
+  100% { transform: scale(1.15); filter: drop-shadow(0 0 6px #ef4444); }
+}
 
 .rp-desc-preview { font-size: 11px; color: var(--text-muted, #475569); }
 

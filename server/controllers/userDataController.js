@@ -5,35 +5,35 @@ import { generateResponse } from "../services/ollamaService.js";
 // Catches common patterns users say about themselves
 const PERSONAL_PATTERNS = [
   // Name
-  { regex: /my name is ([A-Za-z\s]+)/i,               key: "name",        category: "personal" },
-  { regex: /i(?:'m| am) ([A-Za-z]+(?:\s[A-Za-z]+)?)/i, key: "name",      category: "personal" },
-  { regex: /call me ([A-Za-z\s]+)/i,                  key: "name",        category: "personal" },
+  { regex: /my name is ([A-Za-z\s]+)/i, key: "name", category: "personal" },
+  { regex: /i(?:'m| am) ([A-Za-z]+(?:\s[A-Za-z]+)?)/i, key: "name", category: "personal" },
+  { regex: /call me ([A-Za-z\s]+)/i, key: "name", category: "personal" },
   // Age
-  { regex: /i(?:'m| am) (\d{1,2}) years?(?: old)?/i, key: "age",          category: "personal" },
-  { regex: /my age is (\d{1,2})/i,                    key: "age",          category: "personal" },
+  { regex: /i(?:'m| am) (\d{1,2}) years?(?: old)?/i, key: "age", category: "personal" },
+  { regex: /my age is (\d{1,2})/i, key: "age", category: "personal" },
   // Location / city
-  { regex: /i(?:'m| am) from ([A-Za-z\s,]+?)(?:\.|,|$)/i, key: "from",   category: "personal" },
-  { regex: /i live in ([A-Za-z\s,]+?)(?:\.|,|\sand\s|$)/i, key: "city",  category: "personal" },
+  { regex: /i(?:'m| am) from ([A-Za-z\s,]+?)(?:\.|,|$)/i, key: "from", category: "personal" },
+  { regex: /i live in ([A-Za-z\s,]+?)(?:\.|,|\sand\s|$)/i, key: "city", category: "personal" },
   { regex: /(?:based|located) in ([A-Za-z\s,]+?)(?:\.|,|$)/i, key: "city", category: "personal" },
   // College / school
   { regex: /(?:i study|studying) at ([A-Za-z\s]+(?:college|university|institute|iit|nit|school)[A-Za-z\s]*)/i, key: "college", category: "academic" },
   { regex: /(?:i'm|i am|i'm a) student (?:at|of) ([A-Za-z\s]+)/i, key: "college", category: "academic" },
-  { regex: /my college is ([A-Za-z\s]+)/i,            key: "college",      category: "academic" },
+  { regex: /my college is ([A-Za-z\s]+)/i, key: "college", category: "academic" },
   { regex: /i(?:'m| am) in ([A-Za-z\s]+(?:college|university|institute|iit|nit))/i, key: "college", category: "academic" },
   // Course / degree
   { regex: /i(?:'m| am) (?:doing|studying|pursuing) ([A-Za-z\s]+(?:engineering|science|arts|commerce|btech|mtech|bsc|msc|bca|mca|ba|ma|mbbs|mba)[A-Za-z\s]*)/i, key: "course", category: "academic" },
   { regex: /my (?:course|degree|major|stream) is ([A-Za-z\s]+)/i, key: "course", category: "academic" },
   // Job / profession
   { regex: /i(?:'m| am) (?:a |an )?([A-Za-z\s]+(?:developer|engineer|designer|teacher|doctor|manager|analyst|student|intern))/i, key: "job", category: "professional" },
-  { regex: /i work (?:as|at) ([A-Za-z\s]+)/i,       key: "job",           category: "professional" },
-  { regex: /my job is ([A-Za-z\s]+)/i,               key: "job",           category: "professional" },
+  { regex: /i work (?:as|at) ([A-Za-z\s]+)/i, key: "job", category: "professional" },
+  { regex: /my job is ([A-Za-z\s]+)/i, key: "job", category: "professional" },
   // Hobbies
   { regex: /i (?:love|enjoy|like|do) ([A-Za-z\s]+?) (?:in my free time|as a hobby|for fun)/i, key: "hobby", category: "personal" },
   { regex: /my (?:hobby|hobbies|interest) (?:is|are|include) ([A-Za-z\s,]+)/i, key: "hobby", category: "personal" },
   // Language
-  { regex: /i speak ([A-Za-z\s,]+)/i,                key: "language",      category: "personal" },
+  { regex: /i speak ([A-Za-z\s,]+)/i, key: "language", category: "personal" },
   // Goal
-  { regex: /my goal is (?:to )?([A-Za-z\s]+)/i,     key: "goal",          category: "personal" },
+  { regex: /my goal is (?:to )?([A-Za-z\s]+)/i, key: "goal", category: "personal" },
   { regex: /i want to (?:become|be) (?:a |an )?([A-Za-z\s]+)/i, key: "goal", category: "personal" },
 ];
 
@@ -93,7 +93,7 @@ const parseRelativeDate = (text) => {
     if (inMatch[2] === "month") d.setMonth(d.getMonth() + n);
     return d.toISOString();
   }
-  const dayNames = ["sunday","monday","tuesday","wednesday","thursday","friday","saturday"];
+  const dayNames = ["sunday", "monday", "tuesday", "wednesday", "thursday", "friday", "saturday"];
   const nextDay = lower.match(/next\s+(monday|tuesday|wednesday|thursday|friday|saturday|sunday)/);
   if (nextDay) {
     const target = dayNames.indexOf(nextDay[1]); const d = new Date(now);
@@ -104,15 +104,15 @@ const parseRelativeDate = (text) => {
     const d = new Date(now); d.setDate(d.getDate() + 7); d.setHours(9, 0, 0, 0); return d.toISOString();
   }
   // Explicit dates: "10th April", "April 10", "10/04/2026"
-  const months = { jan:0,feb:1,mar:2,apr:3,may:4,jun:5,jul:6,aug:7,sep:8,oct:9,nov:10,dec:11 };
+  const months = { jan: 0, feb: 1, mar: 2, apr: 3, may: 4, jun: 5, jul: 6, aug: 7, sep: 8, oct: 9, nov: 10, dec: 11 };
   const m1 = lower.match(/(\d{1,2})(?:st|nd|rd|th)?\s+(jan|feb|mar|apr|may|jun|jul|aug|sep|oct|nov|dec)\w*(?:\s+(\d{4}))?/);
   if (m1) {
-    const d = new Date(m1[3] ? parseInt(m1[3]) : now.getFullYear(), months[m1[2].slice(0,3)], parseInt(m1[1]), 9, 0, 0);
+    const d = new Date(m1[3] ? parseInt(m1[3]) : now.getFullYear(), months[m1[2].slice(0, 3)], parseInt(m1[1]), 9, 0, 0);
     if (d < now) d.setFullYear(d.getFullYear() + 1); return d.toISOString();
   }
   const m2 = lower.match(/(jan|feb|mar|apr|may|jun|jul|aug|sep|oct|nov|dec)\w*\s+(\d{1,2})(?:st|nd|rd|th)?(?:\s*,?\s*(\d{4}))?/);
   if (m2) {
-    const d = new Date(m2[3] ? parseInt(m2[3]) : now.getFullYear(), months[m2[1].slice(0,3)], parseInt(m2[2]), 9, 0, 0);
+    const d = new Date(m2[3] ? parseInt(m2[3]) : now.getFullYear(), months[m2[1].slice(0, 3)], parseInt(m2[2]), 9, 0, 0);
     if (d < now) d.setFullYear(d.getFullYear() + 1); return d.toISOString();
   }
   const timeM = lower.match(/at\s+(\d{1,2})(?::(\d{2}))?\s*(am|pm)?/);
@@ -153,7 +153,7 @@ const saveProfileItems = async (userId, items) => {
   if (!items.length) return;
   let userData = await UserData.findOne({ userId });
   if (!userData) userData = new UserData({ userId, profile: [], reminders: [] });
-  
+
   for (const item of items) {
     if (!item.key || !item.value) continue;
     const existingIdx = userData.profile.findIndex(
@@ -177,8 +177,8 @@ const saveProfileItems = async (userId, items) => {
 
 // ── Try AI-based extraction as enhancement (if message looks informative) ──────
 const AI_TRIGGER_PHRASES = [
-  "my name", "i am", "i'm", "i live", "i study", "i work", "my college",
-  "my course", "my job", "my goal", "i enjoy", "my hobby", "i speak", "i'm from"
+  "my ", "i am ", "i'm ", "i live ", "i study", "i work", "i enjoy",
+  "remember", "save", "update my", "change my", "set my", "add", "i have"
 ];
 const looksPersonal = (msg) => AI_TRIGGER_PHRASES.some(p => msg.toLowerCase().includes(p));
 
@@ -187,7 +187,7 @@ const parseJsonFromText = (text) => {
     // Try direct parse
     const parsed = JSON.parse(text.trim());
     if (Array.isArray(parsed)) return parsed;
-  } catch (_) {}
+  } catch (_) { }
   try {
     // Extract array from text
     const start = text.indexOf("[");
@@ -196,7 +196,7 @@ const parseJsonFromText = (text) => {
       const parsed = JSON.parse(text.slice(start, end + 1));
       if (Array.isArray(parsed)) return parsed;
     }
-  } catch (_) {}
+  } catch (_) { }
   return null;
 };
 
@@ -205,17 +205,18 @@ export const extractUserDataFromMessage = async (message, userId) => {
   try {
     // Step 1: Fast regex extraction
     const regexItems = extractByRegex(message);
-    
+
     // Step 2: Only call AI if message looks personal AND is worth it
     let aiItems = [];
     if (looksPersonal(message)) {
       try {
-        const prompt = `Extract user's personal info from this message as JSON array.
+        const prompt = `Extract user's personal info from this message as JSON array. 
+If the user indicates an update or change (e.g. "change my age to 21"), emit the new value.
 Format: [{"key":"name","value":"John","category":"personal"}]
 Categories: personal, academic, professional, preferences, health, other
 Return [] if nothing found. JSON array ONLY, no markdown, no explanation.
 Message: "${message.slice(0, 300)}"`;
-        
+
         const response = await generateResponse(prompt, "chat");
         const parsed = parseJsonFromText(response.replace(/```json|```/g, "").trim());
         if (parsed && Array.isArray(parsed)) {
@@ -225,7 +226,7 @@ Message: "${message.slice(0, 300)}"`;
         // AI failed — regex results are enough
       }
     }
-    
+
     // Merge: AI items enhance regex items (AI wins on conflict)
     const merged = [...regexItems];
     for (const ai of aiItems) {
@@ -236,7 +237,7 @@ Message: "${message.slice(0, 300)}"`;
         merged.push(ai);
       }
     }
-    
+
     await saveProfileItems(userId, merged);
     return merged;
   } catch (err) {
@@ -249,59 +250,85 @@ Message: "${message.slice(0, 300)}"`;
 export const extractRemindersFromMessage = async (message, userId) => {
   try {
     const regexReminders = extractRemindersRegex(message);
-    
+
     // Broader trigger set — catch natural language about schedules
     const TIME_WORDS = [
-      "exam", "test", "quiz", "deadline", "due", "submit", "assignment", 
-      "project", "remind", "schedule", "next week", "tomorrow", "tonight", 
+      "exam", "test", "quiz", "deadline", "due", "submit", "assignment",
+      "project", "remind", "schedule", "next week", "tomorrow", "tonight",
       "meeting", "interview", "don't forget", "remember to", "appointment",
       "presentation", "in 2 days", "in 3 days", "next monday", "next tuesday",
       "next wednesday", "next thursday", "next friday", "by friday", "by monday",
       "this weekend", "need to finish", "hand in", "turn in", "planned", "scheduled",
       "january", "february", "march", "april", "may", "june", "july",
       "august", "september", "october", "november", "december",
+      "cancel", "delete", "remove", "change", "update", "reschedule", "clear",
+      "min", "minute", "minutes", "sec", "second", "seconds"
     ];
     const hasTimeContext = TIME_WORDS.some(w => message.toLowerCase().includes(w));
-    
+
     let aiReminders = [];
     if (hasTimeContext) {
       try {
         const now = new Date();
-        const todayStr = now.toISOString().split("T")[0];
-        const dayOfWeek = ["Sunday","Monday","Tuesday","Wednesday","Thursday","Friday","Saturday"][now.getDay()];
-        
-        const prompt = `Today is ${dayOfWeek}, ${todayStr}. Extract ALL reminders, exams, deadlines, meetings from this message.
+        const currentIso = now.toISOString();
+        const todayStr = currentIso.split("T")[0];
+        const dayOfWeek = ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"][now.getDay()];
+
+        const prompt = `Current absolute Date/Time: ${currentIso} (${dayOfWeek}). Extract ALL reminder actions (add, update, delete) from this message.
 
 RULES:
-- "tomorrow" = ${new Date(now.getTime() + 86400000).toISOString().split("T")[0]}
-- "next week" = 7 days from today
-- Parse month names: "April 10" = 2026-04-10
+- Resolve relative time PERFECTLY. If "in 1 min" or "in one minute", output EXACT timestamp (currentIso + 1 min).
+- "tomorrow" = ${new Date(now.getTime() + 86400000).toISOString().split("T")[0]}T09:00:00.000Z
 - If no date but time-sensitive, pick the most logical upcoming date
-- Return [] if nothing time-sensitive
+- action MUST format exactly as "add", "update", or "delete".
+- If deleting or cancelling, set action: "delete". If changing/rescheduling, "update". Otherwise "add".
+- Return [] if nothing time-sensitive.
 
-Return JSON ONLY: [{"title":"Math Exam","description":"","dueDate":"2026-04-10T09:00:00.000Z","category":"exam"}]
+Return JSON ONLY: [{"action":"add", "title":"Stop Pasta", "description":"", "dueDate":"${currentIso}", "category":"reminder"}]
 Categories: exam, event, task, reminder, other
 Message: "${message.slice(0, 400)}"`;
-        
+
         const response = await generateResponse(prompt, "chat");
         const parsed = parseJsonFromText(response.replace(/```json|```/g, "").trim());
         if (parsed && Array.isArray(parsed)) {
           aiReminders = parsed.filter(r => r.title && r.title.length > 2);
         }
-      } catch (_) {}
+      } catch (_) { }
     }
-    
-    const toSave = aiReminders.length > 0 ? aiReminders : regexReminders;
+
+    const toSave = aiReminders.length > 0 ? aiReminders : regexReminders.map(r => ({ ...r, action: "add" }));
     if (!toSave.length) return [];
-    
+
     let userData = await UserData.findOne({ userId });
     if (!userData) userData = new UserData({ userId, profile: [], reminders: [] });
-    
+
     for (const item of toSave) {
+      if (!item.title) continue;
       const normalTitle = item.title.toLowerCase().trim();
-      const exists = userData.reminders.some(r => r.title.toLowerCase().trim() === normalTitle);
-      if (exists) continue;
-      
+
+      // Best-effort fuzzy match for existing reminders
+      const existingIdx = userData.reminders.findIndex(r => {
+        const t = r.title.toLowerCase().trim();
+        return (t.includes(normalTitle) && normalTitle.length > 3) || (normalTitle.includes(t) && t.length > 3) || t === normalTitle;
+      });
+
+      const action = item.action || "add";
+
+      if (action === "delete" || action === "remove") {
+        if (existingIdx >= 0) userData.reminders.splice(existingIdx, 1);
+        continue;
+      }
+
+      if (action === "update" && existingIdx >= 0) {
+        if (item.dueDate) userData.reminders[existingIdx].dueDate = new Date(item.dueDate);
+        if (item.title && item.title.length > 3) userData.reminders[existingIdx].title = item.title;
+        if (item.category) userData.reminders[existingIdx].category = item.category;
+        continue;
+      }
+
+      // Default Add (Deduplicate exact matches)
+      if (existingIdx >= 0 && userData.reminders[existingIdx].title.toLowerCase() === normalTitle) continue;
+
       userData.reminders.push({
         title: item.title,
         description: item.description || "",
@@ -315,7 +342,8 @@ Message: "${message.slice(0, 400)}"`;
         })),
       });
     }
-    
+
+    userData.markModified('reminders');
     await userData.save();
     return toSave;
   } catch (err) {
@@ -344,11 +372,11 @@ export const updateProfileEntry = async (req, res) => {
     if (!userData) userData = new UserData({ userId, profile: [], reminders: [] });
     const idx = userData.profile.findIndex(p => p._id.toString() === req.params.id);
     if (idx >= 0) {
-      if (key)      userData.profile[idx].key      = key;
-      if (value)    userData.profile[idx].value    = value;
+      if (key) userData.profile[idx].key = key;
+      if (value) userData.profile[idx].value = value;
       if (category) userData.profile[idx].category = category;
       userData.profile[idx].updatedAt = new Date();
-      userData.profile[idx].source    = "manual";
+      userData.profile[idx].source = "manual";
     } else {
       return res.status(404).json({ error: "Entry not found" });
     }
@@ -369,9 +397,9 @@ export const addProfileEntry = async (req, res) => {
     // Check duplicate
     const existingIdx = userData.profile.findIndex(p => p.key.toLowerCase() === key.toLowerCase());
     if (existingIdx >= 0) {
-      userData.profile[existingIdx].value    = value;
+      userData.profile[existingIdx].value = value;
       userData.profile[existingIdx].category = category || userData.profile[existingIdx].category;
-      userData.profile[existingIdx].updatedAt= new Date();
+      userData.profile[existingIdx].updatedAt = new Date();
     } else {
       userData.profile.push({ key, value, category: category || "personal", source: "manual" });
     }

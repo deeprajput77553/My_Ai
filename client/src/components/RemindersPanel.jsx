@@ -154,6 +154,58 @@ function AddReminderModal({ onClose, onSaved }) {
   );
 }
 
+// Helpers
+function LiveCountdown({ dueDate, completed }) {
+  const [timeLeft, setTimeLeft] = useState("");
+  const [urgency, setUrgency] = useState("");
+
+  useEffect(() => {
+    if (completed) return;
+    const target = new Date(dueDate).getTime();
+
+    const update = () => {
+      const now = Date.now();
+      const diff = target - now;
+      if (diff <= 0) {
+        setTimeLeft("Time's up!");
+        setUrgency("past");
+        return;
+      }
+
+      const d = Math.floor(diff / (1000 * 60 * 60 * 24));
+      const h = Math.floor((diff / (1000 * 60 * 60)) % 24);
+      const m = Math.floor((diff / 1000 / 60) % 60);
+      const s = Math.floor((diff / 1000) % 60);
+
+      if (d > 1) {
+        setTimeLeft(`${d}d left`);
+        setUrgency("normal");
+      } else if (d === 1) {
+        setTimeLeft(`${d}d ${h}h left`);
+        setUrgency("soon");
+      } else {
+        // Less than 24 hours - show seconds
+        setTimeLeft(`${h}h ${m}m ${s}s left`);
+        setUrgency(h === 0 && m < 30 ? "critical" : "today");
+      }
+    };
+
+    update();
+    const interval = setInterval(update, 1000);
+    return () => clearInterval(interval);
+  }, [dueDate, completed]);
+
+  if (completed) return null;
+
+  return (
+    <span className={`rp-countdown-badge ${urgency}`}>
+      {urgency === "critical" && <i className="fi fi-sr-time-fast countdown-icon pulse"></i>}
+      {urgency === "today" && <i className="fi fi-sr-clock countdown-icon"></i>}
+      {timeLeft}
+    </span>
+  );
+}
+
 // ── Main Panel ────────────────────────────────────────────────────────────────
 function RemindersPanel() {
   const [userData, setUserData]     = useState({ reminders: [] });
@@ -379,11 +431,7 @@ function RemindersPanel() {
                       {r.dueDate && (
                         <span className={`rp-due ${days !== null && days < 0 ? "overdue" : days !== null && days <= 1 ? "urgent-text" : ""}`}>
                           {formatDateTime(r.dueDate)}
-                          {days !== null && (
-                            <span className={`rp-days-badge ${days < 0 ? "past" : days === 0 ? "today" : days <= 3 ? "soon" : ""}`}>
-                              {days < 0 ? `${Math.abs(days)}d ago` : days === 0 ? "Today!" : `${days}d left`}
-                            </span>
-                          )}
+                          <LiveCountdown dueDate={r.dueDate} completed={r.completed} />
                         </span>
                       )}
                       {r.description && (
