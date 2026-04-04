@@ -23,6 +23,7 @@ import "./App.css";
 // 🎤  useVoice — Speech Recognition + TTS hook
 // ─────────────────────────────────────────────────────────────────────────────
 function useVoice({ onTranscript, onAutoSend }) {
+  const { settings } = useSettings();
   const [listening, setListening] = useState(false);
   const [supported, setSupported] = useState(false);
   const [ttsEnabled, setTtsEnabled] = useState(true);
@@ -37,6 +38,12 @@ function useVoice({ onTranscript, onAutoSend }) {
     onTranscriptRef.current = onTranscript;
     onAutoSendRef.current = onAutoSend;
   }, [onTranscript, onAutoSend]);
+
+  // Sync TTS enabled state with settings
+  useEffect(() => {
+    const isAuto = settings?.ttsAutoPlay ?? false;
+    setTtsEnabled(isAuto);
+  }, [settings?.ttsAutoPlay]);
 
   useEffect(() => {
     const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
@@ -472,7 +479,13 @@ function App() {
     const aiDisplayId = `ai_${now + 1}`;
     setDisplayedMessages((prev) => [...prev, { role: "user", content: text, _displayId: userDisplayId, _timestamp: now }]);
     try {
-      const res = await sendMessage(text, resolvedConvId, apiProvider);
+      const res = await sendMessage(
+        text, 
+        resolvedConvId, 
+        apiProvider, 
+        settings.userDataLearning, 
+        settings.usageAnalytics
+      );
       const { conversationId: newConvId, aiMessage, searchResults, images, searchQuery, modelUsed, apiProvider: returnedApiProvider, weather, news } = res.data;
       setConversationId(newConvId);
       setDisplayedMessages((prev) => [...prev, { role: "ai", content: aiMessage, _displayId: aiDisplayId, _timestamp: Date.now() }]);

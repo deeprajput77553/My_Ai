@@ -212,9 +212,11 @@ export const sendMessage = async (req, res) => {
     conversation.messages.push({ role: "ai", content: aiResponse });
     await conversation.save();
 
-    // Background: extract user data + reminders (non-blocking)
-    extractUserDataFromMessage(message, userId).catch(e => console.error("userData:", e.message));
-    extractRemindersFromMessage(message, userId).catch(e => console.error("reminders:", e.message));
+    // Background: extract user data + reminders (non-blocking) - Only if learning is enabled
+    if (req.body.learning !== false) {
+      extractUserDataFromMessage(message, userId).catch(e => console.error("userData:", e.message));
+      extractRemindersFromMessage(message, userId).catch(e => console.error("reminders:", e.message));
+    }
 
     res.json({
       conversationId: conversation._id,

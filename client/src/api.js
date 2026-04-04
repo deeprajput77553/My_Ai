@@ -1,7 +1,7 @@
 import axios from "axios";
 
 const API = axios.create({
-  baseURL: "http://localhost:5000/api",
+  baseURL: import.meta.env.VITE_API_URL || "http://localhost:5000/api",
 });
 
 // Add token to all requests if it exists
@@ -19,8 +19,8 @@ API.interceptors.request.use(
 );
 
 // ── Chat ──────────────────────────────────────────
-export const sendMessage = (message, conversationId, apiProvider) =>
-  API.post("/chat", { message, conversationId, apiProvider });
+export const sendMessage = (message, conversationId, apiProvider, learning = true, analytics = false) =>
+  API.post("/chat", { message, conversationId, apiProvider, learning, analytics });
 
 export const getChats          = ()     => API.get("/chat");
 export const getConversation   = (id)   => API.get(`/chat/${id}`);

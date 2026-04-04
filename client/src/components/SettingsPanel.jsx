@@ -237,10 +237,10 @@ function SettingsPanel() {
       {/* === Privacy === */}
       <Section title="Privacy & Data">
         <SettingRow icon="🗂️" label="User Data Learning" description="Allow AI to learn from your messages">
-          <ToggleSwitch value={true} onChange={() => {}} />
+          <ToggleSwitch value={settings.userDataLearning} onChange={v => updateSetting("userDataLearning", v)} />
         </SettingRow>
         <SettingRow icon="📊" label="Usage Analytics" description="Help improve the app (anonymous)">
-          <ToggleSwitch value={false} onChange={() => {}} />
+          <ToggleSwitch value={settings.usageAnalytics} onChange={v => updateSetting("usageAnalytics", v)} />
         </SettingRow>
       </Section>
 

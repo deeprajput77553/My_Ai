@@ -9,6 +9,8 @@ const DEFAULTS = {
   animations: true,
   notificationsEnabled: true,
   ttsAutoPlay: false,
+  userDataLearning: true,
+  usageAnalytics: false,
   language: "en",
 };
 
