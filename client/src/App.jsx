@@ -1,4 +1,6 @@
 import { useEffect, useState, useRef, useCallback } from "react";
+import axios from "axios";
+
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
 import { sendMessage, getChats, getConversation } from "./api";
@@ -73,14 +75,14 @@ function useVoice({ onTranscript, onAutoSend }) {
       const currentAccumulated = transcriptRef.current + final;
       const currentEmitted = (currentAccumulated + " " + interim).trim();
       lastEmittedRef.current = currentEmitted;
-      
+
       if (final) {
         transcriptRef.current += final;
         if (silenceTimerRef.current) clearTimeout(silenceTimerRef.current);
         silenceTimerRef.current = setTimeout(() => {
           if (onAutoSendRef.current && transcriptRef.current.trim()) {
             const textToSend = transcriptRef.current.trim();
-            transcriptRef.current = ""; 
+            transcriptRef.current = "";
             lastEmittedRef.current = ""; // Prevent double fire in onend
             onAutoSendRef.current(textToSend);
             if (recognitionRef.current) recognitionRef.current.stop(); // Stop mic to avoid hearing itself!
@@ -99,7 +101,7 @@ function useVoice({ onTranscript, onAutoSend }) {
         clearTimeout(silenceTimerRef.current);
         silenceTimerRef.current = null;
       }
-      
+
       // If we stop and have text that wasn't already sent by the timer, send it now
       if (lastEmittedRef.current.trim()) {
         const textToSend = lastEmittedRef.current.trim();
@@ -145,9 +147,9 @@ function useVoice({ onTranscript, onAutoSend }) {
     if (!ttsEnabled) return;
     if (!window.speechSynthesis) return;
     window.speechSynthesis.cancel();
-    
+
     const clean = text
-      .replace(/<think>[\s\S]*?<\/think>/g, "") 
+      .replace(/<think>[\s\S]*?<\/think>/g, "")
       .replace(/```[\s\S]*?```/g, "code block")
       .replace(/`([^`]+)`/g, "$1")
       .replace(/\*\*(.+?)\*\*/g, "$1")
@@ -165,7 +167,7 @@ function useVoice({ onTranscript, onAutoSend }) {
       v.name.toLowerCase().includes("female") || v.name.toLowerCase().includes("zira") ||
       v.name.toLowerCase().includes("samantha") || v.name.toLowerCase().includes("google uk english female")
     ) || voices[0];
-    
+
     utt.voice = femaleVoice;
     utt.rate = 1.05; utt.pitch = 1; utt.volume = 1;
     window.speechSynthesis.speak(utt);
@@ -185,39 +187,31 @@ const ChatMarkdown = ({ content }) => (
     components={{
       code({ node, inline, className, children, ...props }) {
         if (inline) return (
-          <code style={{
-            background: "rgba(30,41,59,0.9)", border: "1px solid rgba(255,255,255,0.08)",
-            padding: "2px 6px", borderRadius: "4px", fontSize: "13px",
-            color: "#7dd3fc", fontFamily: "Fira Code, Consolas, monospace",
-          }} {...props}>{children}</code>
+          <code className="markdown-inline-code" {...props}>{children}</code>
         );
         return <CodeBlock className={className}>{children}</CodeBlock>;
       },
       blockquote: ({ children }) => (
-        <blockquote style={{
-          borderLeft: "3px solid #6366f1", background: "rgba(99,102,241,0.08)",
-          padding: "10px 14px", borderRadius: "0 8px 8px 0", margin: "12px 0",
-          color: "#94a3b8", fontStyle: "italic", textAlign: "left",
-        }}>{children}</blockquote>
+        <blockquote className="markdown-blockquote">{children}</blockquote>
       ),
-      p: ({ children }) => <p style={{ margin: "0 0 10px", textAlign: "left" }}>{children}</p>,
-      ul: ({ children }) => <ul style={{ paddingLeft: "20px", margin: "0 0 10px", textAlign: "left" }}>{children}</ul>,
-      ol: ({ children }) => <ol style={{ paddingLeft: "20px", margin: "0 0 10px", textAlign: "left" }}>{children}</ol>,
-      li: ({ children }) => <li style={{ marginBottom: "4px", textAlign: "left" }}>{children}</li>,
-      h1: ({ children }) => <h1 style={{ fontSize: "20px", fontWeight: 700, color: "#f1f5f9", margin: "16px 0 8px", textAlign: "left" }}>{children}</h1>,
-      h2: ({ children }) => <h2 style={{ fontSize: "17px", fontWeight: 600, color: "#e2e8f0", margin: "14px 0 6px", textAlign: "left" }}>{children}</h2>,
-      h3: ({ children }) => <h3 style={{ fontSize: "15px", fontWeight: 600, color: "#cbd5e1", margin: "12px 0 4px", textAlign: "left" }}>{children}</h3>,
-      strong: ({ children }) => <strong style={{ color: "#f1f5f9", fontWeight: 600 }}>{children}</strong>,
+      p: ({ children }) => <p className="markdown-p">{children}</p>,
+      ul: ({ children }) => <ul className="markdown-ul">{children}</ul>,
+      ol: ({ children }) => <ol className="markdown-ol">{children}</ol>,
+      li: ({ children }) => <li className="markdown-li">{children}</li>,
+      h1: ({ children }) => <h1 className="markdown-h1">{children}</h1>,
+      h2: ({ children }) => <h2 className="markdown-h2">{children}</h2>,
+      h3: ({ children }) => <h3 className="markdown-h3">{children}</h3>,
+      strong: ({ children }) => <strong className="markdown-strong">{children}</strong>,
       table: ({ children }) => (
-        <div style={{ overflowX: "auto", margin: "14px 0" }}>
-          <table style={{ width: "100%", borderCollapse: "collapse", fontSize: "13px" }}>{children}</table>
+        <div className="markdown-table-wrapper">
+          <table className="markdown-table">{children}</table>
         </div>
       ),
       th: ({ children }) => (
-        <th style={{ padding: "8px 12px", background: "rgba(56,189,248,0.12)", color: "#7dd3fc", fontWeight: 700, textAlign: "left", borderBottom: "1px solid rgba(56,189,248,0.2)" }}>{children}</th>
+        <th className="markdown-th">{children}</th>
       ),
       td: ({ children }) => (
-        <td style={{ padding: "8px 12px", borderBottom: "1px solid rgba(255,255,255,0.05)", color: "#cbd5e1", textAlign: "left" }}>{children}</td>
+        <td className="markdown-td">{children}</td>
       ),
     }}
   >
@@ -315,9 +309,12 @@ function UserMessage({ content, onResend }) {
   );
   return (
     <div className="userMsgWrapper" onDoubleClick={() => setEditing(true)}>
-      <div className="userMsg">{content}</div>
+      <div className="userMsg">
+        <ChatMarkdown content={content} />
+      </div>
     </div>
   );
+
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -360,8 +357,8 @@ function ModelSelector({ value, onChange }) {
       {isOpen && (
         <div className="model-selector-options">
           {options.map(opt => (
-            <div 
-              key={opt.id} 
+            <div
+              key={opt.id}
               className={`model-option ${value === opt.id ? "active" : ""}`}
               onClick={() => { onChange(opt.id); setIsOpen(false); }}
             >
@@ -380,7 +377,8 @@ function ModelSelector({ value, onChange }) {
 
 // ─────────────────────────────────────────────────────────────────────────────
 function App() {
-  const { isAuthenticated, loading: authLoading, user } = useAuth();
+  const { isAuthenticated, loading: authLoading, user, logout } = useAuth();
+
   const { settings } = useSettings();
 
   const [activeTab, setActiveTab] = useState("chat");
@@ -399,6 +397,8 @@ function App() {
   const [showSplash, setShowSplash] = useState(true);
 
   const bottomRef = useRef(null);
+  const abortControllerRef = useRef(null);
+
   const handleTypingDone = useCallback(() => setTypingId(null), []);
 
   const voice = useVoice({
@@ -415,7 +415,7 @@ function App() {
       }
       const base = message.includes("🎤") ? message.split("🎤")[0] : message;
       const fullMsg = (base.trim() ? base.trim() + " " : "") + t.trim();
-      
+
       if (fullMsg.trim()) {
         doSend(fullMsg.trim());
       }
@@ -471,6 +471,11 @@ function App() {
   const doSend = useCallback(async (text, convId = null) => {
     const resolvedConvId = convId ?? conversationId;
     if (!text?.trim() || loading) return;
+
+    if (abortControllerRef.current) abortControllerRef.current.abort();
+    const ctrl = new AbortController();
+    abortControllerRef.current = ctrl;
+
     voice.stopSpeaking();
     setLoading(true);
     setMessage("");
@@ -480,11 +485,12 @@ function App() {
     setDisplayedMessages((prev) => [...prev, { role: "user", content: text, _displayId: userDisplayId, _timestamp: now }]);
     try {
       const res = await sendMessage(
-        text, 
-        resolvedConvId, 
-        apiProvider, 
-        settings.userDataLearning, 
-        settings.usageAnalytics
+        text,
+        resolvedConvId,
+        apiProvider,
+        settings.userDataLearning,
+        settings.usageAnalytics,
+        { signal: ctrl.signal }
       );
       const { conversationId: newConvId, aiMessage, searchResults, images, searchQuery, modelUsed, apiProvider: returnedApiProvider, weather, news } = res.data;
       setConversationId(newConvId);
@@ -506,9 +512,25 @@ function App() {
       setTimeout(() => voice.speak(speakableText), 400);
       const listRes = await getChats();
       setConversations(listRes.data);
-    } catch (err) { console.error(err); }
+    } catch (err) {
+      if (err.name === "CanceledError" || err.name === "AbortError" || axios.isCancel(err)) {
+        console.log("Generation stopped by user");
+      } else {
+        console.error(err);
+      }
+    }
     setLoading(false);
+    abortControllerRef.current = null;
   }, [conversationId, loading, voice, apiProvider]);
+
+  const handleStop = () => {
+    if (abortControllerRef.current) {
+      abortControllerRef.current.abort();
+      setLoading(false);
+      setTypingId(null);
+      voice.stopSpeaking();
+    }
+  };
 
   const handleSend = () => { if (message.trim()) doSend(message.trim()); };
 
@@ -595,9 +617,19 @@ function App() {
             {activeTab === "userdata" && "My Data"}
             {activeTab === "settings" && "Settings"}
           </h2>
-          <div className="topbar-right" style={{ display: "flex", alignItems: "center", gap: "10px" }}>
+          <div className="topbar-right">
             <ModelSelector value={apiProvider} onChange={setApiProvider} />
-            <span className="topbar-user">👤 {user?.name}</span>
+            <div className="topbar-account">
+              <button
+                className="topbar-user"
+                onClick={() => setActiveTab("settings")}
+                title="Account Settings"
+              >
+                <div className="topbar-avatar">{user?.name ? user.name.charAt(0).toUpperCase() : "A"}</div>
+                <span className="topbar-name">{user?.name}</span>
+              </button>
+            </div>
+
           </div>
         </div>
 
@@ -718,15 +750,22 @@ function App() {
                       <div className="mic-loader" />
                     ) : (
                       <svg viewBox="0 0 24 24" width="20" height="20" fill="currentColor">
-                        <path d="M12 14c1.66 0 3-1.34 3-3V5c0-1.66-1.34-3-3-3S9 3.34 9 5v6c0 1.66 1.34 3 3 3z"/>
-                        <path d="M17 11c0 2.76-2.24 5-5 5s-5-2.24-5-5H5c0 3.53 2.61 6.43 6 6.92V21h2v-3.08c3.39-.49 6-3.39 6-6.92h-2z"/>
+                        <path d="M12 14c1.66 0 3-1.34 3-3V5c0-1.66-1.34-3-3-3S9 3.34 9 5v6c0 1.66 1.34 3 3 3z" />
+                        <path d="M17 11c0 2.76-2.24 5-5 5s-5-2.24-5-5H5c0 3.53 2.61 6.43 6 6.92V21h2v-3.08c3.39-.49 6-3.39 6-6.92h-2z" />
                       </svg>
                     )}
                   </button>
                 )}
-                <button className="button" onClick={handleSend} disabled={loading || voice.listening}>
-                  Send
-                </button>
+                {loading ? (
+                  <button className="button stop-button" onClick={handleStop}>
+                    <div className="stop-square"></div>
+                    Stop
+                  </button>
+                ) : (
+                  <button className="button" onClick={handleSend} disabled={loading || voice.listening}>
+                    Send
+                  </button>
+                )}
               </div>
             </>
           )}

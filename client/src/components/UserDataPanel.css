@@ -100,10 +100,35 @@
 }
 .udp-filter-pill:hover { border-color: rgba(99,102,241,0.4); color: #a5b4fc; }
 .udp-filter-pill.active {
-  background: rgba(99,102,241,0.15);
-  border-color: rgba(99,102,241,0.4);
-  color: #a5b4fc;
+  background: var(--accent-primary, #6366f1);
+  border-color: #6366f1;
+  color: white;
   font-weight: 600;
+  box-shadow: 0 4px 12px rgba(99, 102, 241, 0.3);
+}
+
+.udp-filter-pill i {
+  font-size: 14px;
+}
+
+/* Icon Gradient Coloring */
+.udp-cat-icon {
+  background: linear-gradient(135deg, #6366f1, #38bdf8);
+  -webkit-background-clip: text;
+  background-clip: text;
+  -webkit-text-fill-color: transparent;
+  font-weight: bold;
+}
+
+.udp-filter-pill.active .udp-cat-icon {
+  -webkit-text-fill-color: white;
+}
+
+[data-theme="light"] .udp-cat-icon {
+  background: linear-gradient(135deg, #4f46e5, #1d4ed8);
+  -webkit-background-clip: text;
+  background-clip: text;
+  -webkit-text-fill-color: transparent;
 }
 
 /* Add form */
@@ -231,13 +256,16 @@
 }
 .udp-cat-badge {
   font-size: 10px;
-  padding: 2px 8px;
+  padding: 4px 10px;
   border-radius: 20px;
-  background: rgba(99,102,241,0.12);
-  border: 1px solid rgba(99,102,241,0.2);
+  background: rgba(99,102,241,0.08);
+  border: 1px solid rgba(99,102,241,0.15);
   color: #a5b4fc;
   font-weight: 600;
   text-transform: capitalize;
+  display: flex;
+  align-items: center;
+  gap: 6px;
 }
 .udp-key {
   font-size: 14px;
@@ -248,28 +276,60 @@
 .udp-card-actions {
   display: flex;
   align-items: center;
-  gap: 6px;
+  gap: 8px;
+  opacity: 0;
+  transform: translateX(10px);
+  transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.udp-card:hover .udp-card-actions {
+  opacity: 1;
+  transform: translateX(0);
 }
 .udp-source-badge {
   font-size: 10px;
-  padding: 2px 7px;
+  padding: 4px 10px;
   border-radius: 20px;
-  background: rgba(52,211,153,0.1);
-  border: 1px solid rgba(52,211,153,0.2);
+  background: rgba(52,211,153,0.08);
+  border: 1px solid rgba(52,211,153,0.15);
   color: #34d399;
+  display: flex;
+  align-items: center;
+  gap: 6px;
 }
 .udp-icon-btn {
-  background: none;
-  border: none;
+  background: rgba(255, 255, 255, 0.03);
+  border: 1px solid rgba(255, 255, 255, 0.05);
+  color: var(--text-secondary, #94a3b8);
   cursor: pointer;
   font-size: 14px;
-  opacity: 0.5;
-  transition: opacity 0.15s, transform 0.15s;
-  padding: 3px;
-  border-radius: 5px;
+  width: 32px;
+  height: 32px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: all 0.2s;
+  padding: 0;
+  border-radius: 8px;
 }
-.udp-icon-btn:hover { opacity: 1; transform: scale(1.1); }
-.udp-icon-btn.del:hover { background: rgba(239,68,68,0.1); }
+
+.udp-icon-btn:hover {
+  background: rgba(99, 102, 241, 0.15);
+  border-color: rgba(99, 102, 241, 0.3);
+  color: #a5b4fc;
+  transform: scale(1.1);
+}
+
+.udp-icon-btn.del:hover {
+  background: rgba(239, 68, 68, 0.15);
+  border-color: rgba(239, 68, 68, 0.3);
+  color: #ef4444;
+}
+
+[data-theme="light"] .udp-icon-btn {
+  background: rgba(0, 0, 0, 0.03);
+  border-color: rgba(0, 0, 0, 0.05);
+}
 
 .udp-card-value {
   font-size: 13px;

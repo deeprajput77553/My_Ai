@@ -21,6 +21,8 @@ function Sidebar({
   activeTab, onTabChange,
 }) {
   const { user, isAdmin } = useAuth();
+
+
   const firstLetter = user?.name ? user.name.charAt(0).toUpperCase() : "A";
 
   const handleDeleteChat = async (e, id) => {
@@ -166,6 +168,8 @@ function Sidebar({
         )}
 
       </div>
+
+
 
       {open && <div className="sidebar-overlay" onClick={() => setOpen(false)} />}
     </>

@@ -19,8 +19,8 @@ API.interceptors.request.use(
 );
 
 // ── Chat ──────────────────────────────────────────
-export const sendMessage = (message, conversationId, apiProvider, learning = true, analytics = false) =>
-  API.post("/chat", { message, conversationId, apiProvider, learning, analytics });
+export const sendMessage = (message, conversationId, apiProvider, learning = true, analytics = false, options = {}) =>
+  API.post("/chat", { message, conversationId, apiProvider, learning, analytics }, options);
 
 export const getChats          = ()     => API.get("/chat");
 export const getConversation   = (id)   => API.get(`/chat/${id}`);

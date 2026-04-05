@@ -8,6 +8,8 @@ const RegisterForm = ({ onSwitchToLogin }) => {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
+  const [showPassword, setShowPassword] = useState(false);
+  const [showConfirmPassword, setShowConfirmPassword] = useState(false);
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
 
@@ -88,33 +90,53 @@ const RegisterForm = ({ onSwitchToLogin }) => {
             />
           </div>
 
-          <div className="form-group">
+          <div className="form-group password-group">
             <label htmlFor="password">Password</label>
-            <input
-              type="password"
-              id="password"
-              value={password}
-              onChange={(e) => setPassword(e.target.value)}
-              required
-              autoComplete="new-password"
-              placeholder="Create a password"
-            />
+            <div className="password-input-wrapper">
+              <input
+                type={showPassword ? "text" : "password"}
+                id="password"
+                value={password}
+                onChange={(e) => setPassword(e.target.value)}
+                required
+                autoComplete="new-password"
+                placeholder="Create a password"
+              />
+              <button 
+                type="button" 
+                className="password-toggle"
+                onClick={() => setShowPassword(!showPassword)}
+                aria-label={showPassword ? "Hide password" : "Show password"}
+              >
+                <i className={showPassword ? "fi fi-rr-eye-crossed" : "fi fi-rr-eye"}></i>
+              </button>
+            </div>
             <small className="form-hint">
               Must be 8+ characters with 1 uppercase letter and 1 number
             </small>
           </div>
 
-          <div className="form-group">
+          <div className="form-group password-group">
             <label htmlFor="confirmPassword">Confirm Password</label>
-            <input
-              type="password"
-              id="confirmPassword"
-              value={confirmPassword}
-              onChange={(e) => setConfirmPassword(e.target.value)}
-              required
-              autoComplete="new-password"
-              placeholder="Confirm your password"
-            />
+            <div className="password-input-wrapper">
+              <input
+                type={showConfirmPassword ? "text" : "password"}
+                id="confirmPassword"
+                value={confirmPassword}
+                onChange={(e) => setConfirmPassword(e.target.value)}
+                required
+                autoComplete="new-password"
+                placeholder="Confirm your password"
+              />
+              <button 
+                type="button" 
+                className="password-toggle"
+                onClick={() => setShowConfirmPassword(!showConfirmPassword)}
+                aria-label={showConfirmPassword ? "Hide password" : "Show password"}
+              >
+                <i className={showConfirmPassword ? "fi fi-rr-eye-crossed" : "fi fi-rr-eye"}></i>
+              </button>
+            </div>
           </div>
 
           <button type="submit" className="auth-button" disabled={loading}>

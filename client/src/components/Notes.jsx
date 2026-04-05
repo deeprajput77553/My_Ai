@@ -219,10 +219,8 @@ function Notes({ onNotesSaved, preloadedNote }) {
     combinedContent += `---\n\n`;
 
     questions.forEach((q, i) => {
-      combinedContent += `## Question ${i + 1}\n\n`;
-      combinedContent += `${q}\n\n`;
       if (answers[i]) {
-        combinedContent += `### Answer\n\n`;
+        combinedContent += `## Answer ${i + 1}\n\n`;
         combinedContent += `${answers[i].answer}\n\n`;
         combinedContent += `---\n\n`;
       }

@@ -7,8 +7,12 @@ import "./UserDataPanel.css";
 
 const CATEGORIES = ["personal", "academic", "professional", "preferences", "health", "other"];
 const CATEGORY_ICONS = {
-  personal: "👤", academic: "🎓", professional: "💼",
-  preferences: "⭐", health: "🏥", other: "📌",
+  personal: "fi fi-rr-user", 
+  academic: "fi fi-rr-graduation-cap", 
+  professional: "fi fi-rr-briefcase",
+  preferences: "fi fi-rr-star", 
+  health: "fi fi-rr-heart-pulse", 
+  other: "fi fi-rr-bookmark",
 };
 
 function UserDataPanel() {
@@ -118,7 +122,8 @@ function UserDataPanel() {
               className={`udp-filter-pill ${filter === c ? "active" : ""}`}
               onClick={() => setFilter(c)}
             >
-              {CATEGORY_ICONS[c]} {c} ({count})
+              <i className={`${CATEGORY_ICONS[c]} udp-cat-icon`}></i>
+              <span>{c} ({count})</span>
             </button>
           ) : null;
         })}
@@ -140,7 +145,7 @@ function UserDataPanel() {
               value={addForm.category}
               onChange={e => setAddForm(p => ({ ...p, category: e.target.value }))}
             >
-              {CATEGORIES.map(c => <option key={c} value={c}>{CATEGORY_ICONS[c]} {c}</option>)}
+              {CATEGORIES.map(c => <option key={c} value={c}>{c}</option>)}
             </select>
           </div>
           <textarea
@@ -203,14 +208,23 @@ function UserDataPanel() {
                 <>
                   <div className="udp-card-header">
                     <div className="udp-card-key">
-                      <span className="udp-cat-badge">{CATEGORY_ICONS[entry.category]} {entry.category}</span>
+                      <div className="udp-cat-badge">
+                        <i className={`${CATEGORY_ICONS[entry.category]} udp-cat-icon`}></i>
+                        <span>{entry.category}</span>
+                      </div>
                       <span className="udp-key">{entry.key}</span>
                     </div>
                     <div className="udp-card-actions">
                       <span className="udp-source-badge">
-                        {entry.source === "chat" ? "AI" : "Manual"}
+                        {entry.source === "chat" ? (
+                          <><i className="fi fi-rr-magic-wand"></i> AI</>
+                        ) : (
+                          <><i className="fi fi-rr-edit"></i> Manual</>
+                        )}
                       </span>
-                      <button className="udp-icon-btn" onClick={() => startEdit(entry)} title="Edit">✏️</button>
+                      <button className="udp-icon-btn" onClick={() => startEdit(entry)} title="Edit">
+                        <i className="fi fi-rr-edit"></i>
+                      </button>
                       <button className="udp-icon-btn del" onClick={() => handleDelete(entry._id)} title="Delete">
                         <i className="fi fi-sr-trash"></i>
                       </button>
