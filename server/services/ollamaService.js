@@ -16,11 +16,11 @@ export const generateResponse = async (prompt, model = "chat", options = {}) => 
   if (provider === "nvidia") {
     try {
       const isCode = model === "code";
-      const targetModel = isCode ? "z-ai/glm5" : "openai/gpt-oss-120b";
+      const targetModel = "meta/llama-3.1-405b-instruct";
       
       const apiKey = isCode 
-        ? (process.env.NVIDIA_API_KEY_CODE || "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") 
-        : (process.env.NVIDIA_API_KEY_CHAT || "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");
+        ? process.env.NVIDIA_API_KEY_CODE 
+        : process.env.NVIDIA_API_KEY_CHAT;
 
       const payload = {
         model: targetModel,

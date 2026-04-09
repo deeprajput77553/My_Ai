@@ -1,8 +1,10 @@
+import { useState } from "react";
 import { deleteChat } from "../api";
 import { useAuth } from "../contexts/AuthContext";
 import "./Sidebar.css";
 
 const NAV_ITEMS = [
+  { id: "dashboard", symbol: "Home",      uicon: "fi fi-rr-apps" },
   { id: "chat",      symbol: "Chat",      uicon: "fi fi-rr-messages" },
   { id: "notes",     symbol: "Notes",     uicon: "fi fi-rr-edit" },
   { id: "reminders", symbol: "Reminders", uicon: "fi fi-rr-bell" },
@@ -21,7 +23,7 @@ function Sidebar({
   activeTab, onTabChange,
 }) {
   const { user, isAdmin } = useAuth();
-
+  const [searchTerm, setSearchTerm] = useState("");
 
   const firstLetter = user?.name ? user.name.charAt(0).toUpperCase() : "A";
 
@@ -95,8 +97,20 @@ function Sidebar({
               <span>＋</span> New Chat
             </button>
             <div className="sidebar-section-label">Recent Chats</div>
+            
+            <div className="sidebar-search">
+              <i className="fi fi-rr-search"></i>
+              <input 
+                type="text" 
+                placeholder="Search chats..." 
+                onChange={(e) => setSearchTerm(e.target.value)}
+              />
+            </div>
+
             <div className="sidebar-history-list">
-              {conversations.length === 0 ? (
+              {conversations.filter(c => 
+                (c.title || "").toLowerCase().includes((searchTerm || "").toLowerCase())
+              ).length === 0 ? (
                 <div className="sidebar-empty">No chats yet</div>
               ) : (
                 conversations.map((conv) => (

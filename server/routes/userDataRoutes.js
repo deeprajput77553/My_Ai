@@ -8,12 +8,16 @@ import {
   addReminder,
   updateReminder,
   deleteReminder,
+  getDashboardData
 } from "../controllers/userDataController.js";
 
 const router = express.Router();
 
 // All routes require auth
 router.use(authenticate);
+
+// Dashboard
+router.get("/dashboard", getDashboardData);
 
 // Profile data
 router.get("/", getUserData);

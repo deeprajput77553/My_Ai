@@ -19,116 +19,89 @@ import SettingsPanel from "./components/SettingsPanel";
 import AdminPanel from "./components/AdminPanel";
 import SplashScreen from "./components/SplashScreen";
 import GlobalNotification from "./components/GlobalNotification";
+import Dashboard from "./components/Dashboard";
+import { extractTextFromFile } from "./utils/fileExtractor";
 import "./App.css";
 
-// ─────────────────────────────────────────────────────────────────────────────
-// 🎤  useVoice — Speech Recognition + TTS hook
-// ─────────────────────────────────────────────────────────────────────────────
 function useVoice({ onTranscript, onAutoSend }) {
   const { settings } = useSettings();
   const [listening, setListening] = useState(false);
   const [supported, setSupported] = useState(false);
   const [ttsEnabled, setTtsEnabled] = useState(true);
+  
+  // Browser Speech State
   const recognitionRef = useRef(null);
   const transcriptRef = useRef("");
   const lastEmittedRef = useRef("");
+  const silenceTimerRef = useRef(null);
+
   const onTranscriptRef = useRef(onTranscript);
   const onAutoSendRef = useRef(onAutoSend);
-  const silenceTimerRef = useRef(null);
 
   useEffect(() => {
     onTranscriptRef.current = onTranscript;
     onAutoSendRef.current = onAutoSend;
   }, [onTranscript, onAutoSend]);
 
-  // Sync TTS enabled state with settings
   useEffect(() => {
-    const isAuto = settings?.ttsAutoPlay ?? false;
-    setTtsEnabled(isAuto);
+    setTtsEnabled(settings?.ttsAutoPlay ?? false);
   }, [settings?.ttsAutoPlay]);
 
+  // Check support and setup Browser SR
   useEffect(() => {
     const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
-    if (!SR) {
-      setSupported(false);
-      return;
-    }
-    setSupported(true);
+    if (SR) {
+      setSupported(true);
+      const rec = new SR();
+      rec.continuous = true;
+      rec.interimResults = true;
+      rec.lang = "en-US";
 
-    const rec = new SR();
-    rec.continuous = true;
-    rec.interimResults = true;
-    rec.lang = "en-US";
-
-    rec.onresult = (e) => {
-      let interim = "";
-      let final = "";
-
-      for (let i = e.resultIndex; i < e.results.length; ++i) {
-        if (e.results[i].isFinal) {
-          final += e.results[i][0].transcript;
-        } else {
-          interim += e.results[i][0].transcript;
+      rec.onresult = (e) => {
+        let interim = ""; let final = "";
+        for (let i = e.resultIndex; i < e.results.length; ++i) {
+          if (e.results[i].isFinal) final += e.results[i][0].transcript;
+          else interim += e.results[i][0].transcript;
         }
-      }
+        const currentEmitted = (transcriptRef.current + final + " " + interim).trim();
+        if (final) {
+          transcriptRef.current += final;
+          if (silenceTimerRef.current) clearTimeout(silenceTimerRef.current);
+          silenceTimerRef.current = setTimeout(() => {
+            if (onAutoSendRef.current && transcriptRef.current.trim()) {
+              onAutoSendRef.current(transcriptRef.current.trim());
+              transcriptRef.current = "";
+              rec.stop();
+            }
+          }, 2000);
+        }
+        if (onTranscriptRef.current) onTranscriptRef.current(currentEmitted);
+      };
 
-      const currentAccumulated = transcriptRef.current + final;
-      const currentEmitted = (currentAccumulated + " " + interim).trim();
-      lastEmittedRef.current = currentEmitted;
+      rec.onend = () => {
+        setListening(false);
+      };
 
-      if (final) {
-        transcriptRef.current += final;
-        if (silenceTimerRef.current) clearTimeout(silenceTimerRef.current);
-        silenceTimerRef.current = setTimeout(() => {
-          if (onAutoSendRef.current && transcriptRef.current.trim()) {
-            const textToSend = transcriptRef.current.trim();
-            transcriptRef.current = "";
-            lastEmittedRef.current = ""; // Prevent double fire in onend
-            onAutoSendRef.current(textToSend);
-            if (recognitionRef.current) recognitionRef.current.stop(); // Stop mic to avoid hearing itself!
-          }
-        }, 2000);
-      }
+      rec.onerror = (e) => {
+        console.warn("Browser Speech Error:", e.error);
+        setListening(false);
+        
+        // Only show intrusive alerts for fatal configuration errors, not for Silence/no-speech timeouts.
+        if (e.error !== "no-speech") {
+          alert(`Microphone Error: "${e.error}"\n\nIf it says "not-allowed", your Windows OS or Browser is physically blocking access (Check Windows Settings > Privacy > Microphone).\nIf it says "network", a firewall/VPN is blocking the speech service.`);
+        }
+      };
 
-      if (onTranscriptRef.current) {
-        onTranscriptRef.current(currentEmitted);
-      }
-    };
-
-    rec.onend = () => {
-      setListening(false);
-      if (silenceTimerRef.current) {
-        clearTimeout(silenceTimerRef.current);
-        silenceTimerRef.current = null;
-      }
-
-      // If we stop and have text that wasn't already sent by the timer, send it now
-      if (lastEmittedRef.current.trim()) {
-        const textToSend = lastEmittedRef.current.trim();
-        transcriptRef.current = "";
-        lastEmittedRef.current = "";
-        onAutoSendRef.current(textToSend);
-      }
-    };
-
-    rec.onerror = (e) => {
-      console.warn("SpeechRecognition error:", e.error);
-      setListening(false);
-    };
-
-    recognitionRef.current = rec;
-    return () => {
-      if (silenceTimerRef.current) clearTimeout(silenceTimerRef.current);
-      if (recognitionRef.current) {
-        lastEmittedRef.current = "";
-        recognitionRef.current.stop();
-      }
-    };
+      recognitionRef.current = rec;
+    }
   }, []);
 
   const toggleMic = useCallback(() => {
     const rec = recognitionRef.current;
-    if (!rec) return;
+    if (!rec) {
+      alert("Microphone access is blocked or unsupported.\n\nIf you are using Brave, go to Settings ➔ Privacy and security ➔ ENABLE 'Google Services for Push Messaging' (or 'Speech Recognition'), and ensure mic permissions are granted to use voice chat.");
+      return;
+    }
     if (listening) {
       rec.stop();
     } else {
@@ -144,33 +117,15 @@ function useVoice({ onTranscript, onAutoSend }) {
   }, [listening]);
 
   const speak = useCallback((text) => {
-    if (!ttsEnabled) return;
-    if (!window.speechSynthesis) return;
+    if (!ttsEnabled || !window.speechSynthesis) return;
     window.speechSynthesis.cancel();
-
-    const clean = text
-      .replace(/<think>[\s\S]*?<\/think>/g, "")
-      .replace(/```[\s\S]*?```/g, "code block")
-      .replace(/`([^`]+)`/g, "$1")
-      .replace(/\*\*(.+?)\*\*/g, "$1")
-      .replace(/\*(.+?)\*/g, "$1")
-      .replace(/#{1,6}\s/g, "")
-      .replace(/\[(.+?)\]\(.+?\)/g, "$1")
-      .trim()
-      .slice(0, 600);
-
+    const clean = text.replace(/<think>[\s\S]*?<\/think>/g, "").replace(/```[\s\S]*?```/g, "code").trim().slice(0, 600);
     if (!clean) return;
-
+    const utterance = new SpeechSynthesisUtterance(clean);
     const voices = window.speechSynthesis.getVoices();
-    const utt = new SpeechSynthesisUtterance(clean);
-    const femaleVoice = voices.find(v =>
-      v.name.toLowerCase().includes("female") || v.name.toLowerCase().includes("zira") ||
-      v.name.toLowerCase().includes("samantha") || v.name.toLowerCase().includes("google uk english female")
-    ) || voices[0];
-
-    utt.voice = femaleVoice;
-    utt.rate = 1.05; utt.pitch = 1; utt.volume = 1;
-    window.speechSynthesis.speak(utt);
+    utterance.voice = voices.find(v => v.name.toLowerCase().includes("female") || v.name.toLowerCase().includes("google uk english female")) || voices[0];
+    utterance.rate = 1.05;
+    window.speechSynthesis.speak(utterance);
   }, [ttsEnabled]);
 
   const stopSpeaking = useCallback(() => { window.speechSynthesis?.cancel(); }, []);
@@ -381,7 +336,7 @@ function App() {
 
   const { settings } = useSettings();
 
-  const [activeTab, setActiveTab] = useState("chat");
+  const [activeTab, setActiveTab] = useState("dashboard");
   const [message, setMessage] = useState("");
   const [apiProvider, setApiProvider] = useState("nvidia");
   const [conversations, setConversations] = useState([]);
@@ -395,6 +350,10 @@ function App() {
   const [activeNotesIndex, setActiveNotesIndex] = useState(null);
   const [loadedNote, setLoadedNote] = useState(null);
   const [showSplash, setShowSplash] = useState(true);
+
+  // File analysis state
+  const [file, setFile] = useState(null);
+  const fileInputRef = useRef(null);
 
   const bottomRef = useRef(null);
   const abortControllerRef = useRef(null);
@@ -468,9 +427,18 @@ function App() {
     return d.toLocaleDateString("en-IN", { day: "2-digit", month: "short" }) + `, ${time}`;
   };
 
+  const handleFileChange = (e) => {
+    const picked = e.target.files[0];
+    if (!picked) return;
+    setFile(picked);
+    e.target.value = "";
+  };
+
+  const removeFile = () => setFile(null);
+
   const doSend = useCallback(async (text, convId = null) => {
     const resolvedConvId = convId ?? conversationId;
-    if (!text?.trim() || loading) return;
+    if ((!text?.trim() && !file) || loading) return;
 
     if (abortControllerRef.current) abortControllerRef.current.abort();
     const ctrl = new AbortController();
@@ -479,13 +447,29 @@ function App() {
     voice.stopSpeaking();
     setLoading(true);
     setMessage("");
+
+    let finalText = text;
+    let userDisplayContent = text;
+    const currentFile = file;
+    setFile(null); // Clear early
+
+    if (currentFile) {
+      try {
+        const extractedText = await extractTextFromFile(currentFile);
+        finalText = `[File: ${currentFile.name}]\n${extractedText}\n\nUser Question: ${text || "Please analyze this file."}`;
+        userDisplayContent = `📎 **${currentFile.name}**\n\n${text || "Analyzed this file."}`;
+      } catch (err) {
+        console.error("File extraction failed:", err);
+      }
+    }
+
     const now = Date.now();
     const userDisplayId = `user_${now}`;
     const aiDisplayId = `ai_${now + 1}`;
-    setDisplayedMessages((prev) => [...prev, { role: "user", content: text, _displayId: userDisplayId, _timestamp: now }]);
+    setDisplayedMessages((prev) => [...prev, { role: "user", content: userDisplayContent, _displayId: userDisplayId, _timestamp: now }]);
     try {
       const res = await sendMessage(
-        text,
+        finalText,
         resolvedConvId,
         apiProvider,
         settings.userDataLearning,
@@ -521,7 +505,7 @@ function App() {
     }
     setLoading(false);
     abortControllerRef.current = null;
-  }, [conversationId, loading, voice, apiProvider]);
+  }, [conversationId, loading, voice, apiProvider, file, settings.userDataLearning, settings.usageAnalytics]);
 
   const handleStop = () => {
     if (abortControllerRef.current) {
@@ -532,7 +516,7 @@ function App() {
     }
   };
 
-  const handleSend = () => { if (message.trim()) doSend(message.trim()); };
+  const handleSend = () => { if (message.trim() || file) doSend(message.trim()); };
 
   const handleResend = (pairIndex, newText) => {
     setDisplayedMessages((prev) => prev.slice(0, pairIndex));
@@ -611,6 +595,7 @@ function App() {
         <div className="topbar" data-active-tab={activeTab}>
           <button className="menuBtn" onClick={() => setSidebarOpen(o => !o)}>☰</button>
           <h2 className="topbar-title">
+            {activeTab === "dashboard" && "Home"}
             {activeTab === "chat" && "Chat"}
             {activeTab === "notes" && "Notes"}
             {activeTab === "reminders" && "Reminders"}
@@ -635,6 +620,17 @@ function App() {
 
         {/* ── Tab content ── */}
         <div className="tab-content">
+          {/* Dashboard */}
+          {activeTab === "dashboard" && (
+            <Dashboard onNavigate={(tab, promptText) => {
+              setActiveTab(tab);
+              if (tab !== "notes") setLoadedNote(null);
+              if (promptText && tab === "chat") {
+                setTimeout(() => doSend(promptText), 300);
+              }
+            }} />
+          )}
+
           {/* Chat */}
           {activeTab === "chat" && (
             <>
@@ -723,13 +719,36 @@ function App() {
 
               {/* Input bar */}
               <div className="inputArea">
+                <input
+                  type="file"
+                  style={{ display: "none" }}
+                  ref={fileInputRef}
+                  onChange={handleFileChange}
+                  accept=".pdf,.docx,.txt,.json"
+                />
+
+                <button 
+                  className="attachBtn" 
+                  onClick={() => fileInputRef.current?.click()}
+                  title="Attach File (PDF, DOCX, TXT, JSON)"
+                >
+                  <i className="fi fi-rr-paperclip"></i>
+                </button>
+
+                {file && (
+                  <div className="input-file-badge">
+                    <span className="file-name">{file.name}</span>
+                    <button className="file-remove" onClick={removeFile}>×</button>
+                  </div>
+                )}
+
                 {typeof window !== "undefined" && window.speechSynthesis && (
                   <button
                     className={`ttsBtn ${voice.ttsEnabled ? "ttsOn" : ""}`}
                     onClick={() => { voice.stopSpeaking(); voice.setTtsEnabled((p) => !p); }}
                     title={voice.ttsEnabled ? "Voice response ON" : "Voice response OFF"}
                   >
-                    {voice.ttsEnabled ? "🔊" : "🔇"}
+                    {voice.ttsEnabled ? <i className="fi fi-rr-volume"></i> : <i className="fi fi-rr-volume-slash"></i>}
                   </button>
                 )}
                 <input

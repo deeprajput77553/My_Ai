@@ -4,6 +4,10 @@
  * Returns structured current weather data.
  */
 import axios from "axios";
+import dotenv from "dotenv";
+dotenv.config();
+
+const OPENWEATHER_KEY = process.env.OPENWEATHER_API_KEY;
 
 // Extract location from the query string
 // e.g. "weather in mumbai" → "mumbai"
@@ -53,9 +57,55 @@ const getCondition = (code) => {
   return { label: "Cloudy", icon: "☁" };
 };
 
+const getEmojiForCondition = (cond = "") => {
+  const c = cond.toLowerCase();
+  if (c.includes("cloud")) return "☁";
+  if (c.includes("rain") || c.includes("drizzle")) return "🌧";
+  if (c.includes("clear") || c.includes("sun")) return "☀";
+  if (c.includes("storm") || c.includes("thunder")) return "⛈";
+  if (c.includes("snow") || c.includes("ice")) return "❄";
+  if (c.includes("mist") || c.includes("fog") || c.includes("haze")) return "🌫";
+  return "⛅";
+};
+
 export const fetchWeather = async (location) => {
   if (!location) return null;
-  
+
+  // 1. Try OpenWeather (Pro/Official) if key exists
+  if (OPENWEATHER_KEY) {
+    try {
+      const geoUrl = `https://api.openweathermap.org/geo/1.0/direct?q=${encodeURIComponent(location)}&limit=1&appid=${OPENWEATHER_KEY}`;
+      const geoRes = await axios.get(geoUrl);
+      
+      if (geoRes.data && geoRes.data.length > 0) {
+        const { lat, lon, name, state, country } = geoRes.data[0];
+        const weatherUrl = `https://api.openweathermap.org/data/2.5/weather?lat=${lat}&lon=${lon}&units=metric&appid=${OPENWEATHER_KEY}`;
+        const wRes = await axios.get(weatherUrl);
+        const wd = wRes.data;
+
+        return {
+          location: `${name}${state ? `, ${state}` : ""}, ${country}`,
+          queryLocation: location,
+          current: {
+            temperature: Math.round(wd.main.temp),
+            feelsLike:   Math.round(wd.main.feels_like),
+            humidity:    wd.main.humidity,
+            windSpeed:   Math.round(wd.wind.speed * 3.6), // m/s to km/h
+            condition:   wd.weather[0].main,
+            icon:        getEmojiForCondition(wd.weather[0].main),
+            description: wd.weather[0].description,
+            visibility:  wd.visibility / 1000,
+            uvIndex:     0, // Not in basic free tier
+          },
+          forecast: [] // Basic API doesn't include easy forecast without another call
+        };
+      }
+    } catch (e) {
+      console.warn("OpenWeather failed:", e.message, "Falling back to wttr.in");
+    }
+  }
+
+  // 2. Fallback to wttr.in (No key needed)
   try {
     const url = `https://wttr.in/${encodeURIComponent(location)}?format=j1`;
     const { data } = await axios.get(url, {

@@ -18,10 +18,17 @@ const NewsWidget = ({ newsData }) => {
   const [visible, setVisible] = useState(false);
   const [active, setActive] = useState(0);
 
+  const [expanded, setExpanded] = useState(false);
+
   useEffect(() => {
     const t = setTimeout(() => setVisible(true), 120);
     return () => clearTimeout(t);
   }, []);
+
+  // Reset expanded state when article changes
+  useEffect(() => {
+    setExpanded(false);
+  }, [active]);
 
   if (!newsData || newsData.length === 0) return null;
 
@@ -30,6 +37,8 @@ const NewsWidget = ({ newsData }) => {
 
   const current = articles[active];
   const cat = getCategoryFromText(current.title + " " + (current.snippet || ""));
+
+  const isLongSnippet = current.snippet && current.snippet.length > 160;
 
   return (
     <div className={`nw-wrap ${visible ? "nw-in" : ""}`}>
@@ -58,7 +67,17 @@ const NewsWidget = ({ newsData }) => {
           <div className="nw-title">{current.title}</div>
 
           {current.snippet && (
-            <p className="nw-snippet">{current.snippet.slice(0, 160)}{current.snippet.length > 160 ? "…" : ""}</p>
+            <div className="nw-snippet-container">
+              <p className="nw-snippet">
+                {expanded ? current.snippet : current.snippet.slice(0, 160)}
+                {!expanded && isLongSnippet ? "…" : ""}
+              </p>
+              {!expanded && isLongSnippet && (
+                <button className="nw-expander-btn" onClick={() => setExpanded(true)}>
+                  Read more
+                </button>
+              )}
+            </div>
           )}
 
           {current.url && (

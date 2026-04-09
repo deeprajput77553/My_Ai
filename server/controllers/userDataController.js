@@ -1,5 +1,8 @@
 import UserData from "../models/UserData.js";
+import User from "../models/User.js";
 import { generateResponse } from "../services/ollamaService.js";
+import { fetchWeather } from "../services/weatherService.js";
+import { fetchNews } from "../services/newsService.js";
 
 // ── Regex-based personal info extraction (fast, reliable) ─────────────────────
 // Catches common patterns users say about themselves
@@ -462,6 +465,42 @@ export const deleteReminder = async (req, res) => {
     await userData.save();
     res.json(userData);
   } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+};
+export const getDashboardData = async (req, res) => {
+  try {
+    const userId = req.userId;
+    const user = await User.findById(userId);
+    let userData = await UserData.findOne({ userId });
+    
+    // Default location for weather
+    let city = "Mumbai"; 
+    if (userData && userData.profile) {
+      const cityEntry = userData.profile.find(p => p.key.toLowerCase() === "city");
+      if (cityEntry) city = cityEntry.value;
+    }
+
+    // Fetch in parallel
+    const [weather, news] = await Promise.all([
+      fetchWeather(city).catch(() => null),
+      fetchNews("latest news", 3).catch(() => [])
+    ]);
+
+    const upcomingReminders = userData ? userData.reminders
+      .filter(r => !r.completed && r.dueDate && new Date(r.dueDate) > new Date())
+      .sort((a, b) => new Date(a.dueDate) - new Date(b.dueDate))
+      .slice(0, 3) : [];
+
+    res.json({
+      user: { name: user?.name || "User" },
+      weather,
+      news,
+      reminders: upcomingReminders,
+      date: new Date().toISOString()
+    });
+  } catch (err) {
+    console.error("Dashboard data error:", err);
     res.status(500).json({ error: err.message });
   }
 };

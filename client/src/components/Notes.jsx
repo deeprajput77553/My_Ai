@@ -246,6 +246,12 @@ function Notes({ onNotesSaved, preloadedNote }) {
 
   const filename = (prompt || file?.name || "notes").slice(0, 30).replace(/\s+/g, "_");
 
+  // Android File Picker often ignores simple extensions, so we conditionally add explicit MIME types for it.
+  const isAndroid = /Android/i.test(navigator.userAgent);
+  const acceptTypes = isAndroid 
+    ? "application/pdf,application/vnd.openxmlformats-officedocument.wordprocessingml.document,text/plain,application/json,.pdf,.docx,.txt,.json"
+    : ".pdf,.docx,.txt,.json";
+
   return (
     <div className="notesPage">
 
@@ -254,7 +260,7 @@ function Notes({ onNotesSaved, preloadedNote }) {
         <input
           ref={fileInputRef}
           type="file"
-          accept=".pdf,.docx,.txt,.json"
+          accept={acceptTypes}
           style={{ display: "none" }}
           onChange={handleFileChange}
         />

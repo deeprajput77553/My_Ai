@@ -25,6 +25,7 @@ export const sendMessage = (message, conversationId, apiProvider, learning = tru
 export const getChats          = ()     => API.get("/chat");
 export const getConversation   = (id)   => API.get(`/chat/${id}`);
 export const deleteChat        = (id)   => API.delete(`/chat/${id}`);
+export const transcribeAudio = (formData) => API.post("/audio/transcribe", formData, { headers: { "Content-Type": "multipart/form-data" } });
 
 // ── Notes ─────────────────────────────────────────
 export const generateNotes          = (prompt)   => API.post("/notes/generate", { prompt });
@@ -33,6 +34,7 @@ export const answerQuestion         = (question) => API.post("/notes/answer", { 
 
 // ── User Data ──────────────────────────────────────
 export const getUserData        = ()         => API.get("/userdata");
+export const getDashboardData   = ()         => API.get("/userdata/dashboard");
 export const addProfileEntry    = (entry)    => API.post("/userdata/profile", entry);
 export const updateProfileEntry = (id, data) => API.put(`/userdata/profile/${id}`, data);
 export const deleteProfileEntry = (id)       => API.delete(`/userdata/profile/${id}`);

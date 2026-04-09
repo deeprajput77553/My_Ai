@@ -4,6 +4,31 @@
  * Sources: Reuters, BBC, Times of India, Google News RSS
  */
 import axios from "axios";
+import dotenv from "dotenv";
+dotenv.config();
+
+const NEWSDATA_KEY = process.env.NEWSDATA_API_KEY;
+
+const fetchFromNewsData = async (query = "", count = 5) => {
+  if (!NEWSDATA_KEY) return [];
+  try {
+    const q = query.toLowerCase() === "latest news" ? "" : query.trim();
+    const qParam = q ? `&q=${encodeURIComponent(q)}` : "";
+    const url = `https://newsdata.io/api/1/news?apikey=${NEWSDATA_KEY}&language=en${qParam}`;
+    const { data } = await axios.get(url, { timeout: 8000 });
+    if (!data?.results) return [];
+    return data.results.map(r => ({
+      title: r.title,
+      snippet: r.description || r.content || r.title,
+      url: r.link,
+      source: r.source_id?.toUpperCase() || "News",
+      publishedAt: r.pubDate
+    })).slice(0, count);
+  } catch (err) {
+    console.warn("NewsData API failed, using RSS fallback");
+    return [];
+  }
+};
 
 const RSS_SOURCES = [
   {
@@ -116,6 +141,11 @@ const detectNewsCategory = (query) => {
  * Returns up to `count` news articles relevant to the query.
  */
 export const fetchNews = async (query = "", count = 5) => {
+  // 1. Try NewsData.io (Pro)
+  const officialNews = await fetchFromNewsData(query, count);
+  if (officialNews.length > 0) return officialNews;
+
+  // 2. Fallback to RSS
   const category = detectNewsCategory(query);
 
   // Pick best sources for the category
