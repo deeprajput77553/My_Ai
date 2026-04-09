@@ -28,7 +28,7 @@ function useVoice({ onTranscript, onAutoSend }) {
   const [listening, setListening] = useState(false);
   const [supported, setSupported] = useState(false);
   const [ttsEnabled, setTtsEnabled] = useState(true);
-  
+
   // Browser Speech State
   const recognitionRef = useRef(null);
   const transcriptRef = useRef("");
@@ -85,7 +85,7 @@ function useVoice({ onTranscript, onAutoSend }) {
       rec.onerror = (e) => {
         console.warn("Browser Speech Error:", e.error);
         setListening(false);
-        
+
         // Only show intrusive alerts for fatal configuration errors, not for Silence/no-speech timeouts.
         if (e.error !== "no-speech") {
           alert(`Microphone Error: "${e.error}"\n\nIf it says "not-allowed", your Windows OS or Browser is physically blocking access (Check Windows Settings > Privacy > Microphone).\nIf it says "network", a firewall/VPN is blocking the speech service.`);
@@ -637,9 +637,9 @@ function App() {
               <div className="chatBox">
                 {displayedMessages.length === 0 && !loading && (
                   <div className="chat-empty">
-                    <div className="chat-empty-icon">✨</div>
+                    <div className="chat-empty-icon"><i className="fi fi-rr-sparkles"></i></div>
                     <div className="chat-empty-title">How can I help you today?</div>
-                    <div className="chat-empty-sub">Ask me anything, or tap the mic to speak.</div>
+                    <div className="chat-empty-sub">Ask me anything, or tap the <i className="fi fi-rr-microphone" style={{ verticalAlign: 'middle', fontSize: '1.2em', color: 'var(--accent-1)' }}></i> icon to speak.</div>
                     <div className="chat-suggestions">
                       {["What's the weather today?", "Latest news headlines", "Explain quantum physics", "Write a Python script"].map(s => (
                         <button key={s} className="chat-suggestion-pill" onClick={() => doSend(s)}>
@@ -727,8 +727,8 @@ function App() {
                   accept=".pdf,.docx,.txt,.json"
                 />
 
-                <button 
-                  className="attachBtn" 
+                <button
+                  className="attachBtn"
                   onClick={() => fileInputRef.current?.click()}
                   title="Attach File (PDF, DOCX, TXT, JSON)"
                 >
@@ -756,7 +756,7 @@ function App() {
                   value={message}
                   onChange={(e) => setMessage(e.target.value)}
                   onKeyDown={handleKeyDown}
-                  placeholder={voice.listening ? "Listening…" : "Ask something or tap 🎤"}
+                  placeholder={voice.listening ? "Listening…" : "Ask something..."}
                 />
                 {voice.supported && (
                   <button
@@ -768,10 +768,7 @@ function App() {
                     {((loading || typingId) && !voice.listening) ? (
                       <div className="mic-loader" />
                     ) : (
-                      <svg viewBox="0 0 24 24" width="20" height="20" fill="currentColor">
-                        <path d="M12 14c1.66 0 3-1.34 3-3V5c0-1.66-1.34-3-3-3S9 3.34 9 5v6c0 1.66 1.34 3 3 3z" />
-                        <path d="M17 11c0 2.76-2.24 5-5 5s-5-2.24-5-5H5c0 3.53 2.61 6.43 6 6.92V21h2v-3.08c3.39-.49 6-3.39 6-6.92h-2z" />
-                      </svg>
+                      <i className="fi fi-rr-microphone"></i>
                     )}
                   </button>
                 )}

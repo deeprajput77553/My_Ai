@@ -13,8 +13,52 @@
   to { opacity: 1; transform: translateY(0); }
 }
 
+.db-greeting-container {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-end;
+  gap: 24px;
+  flex-wrap: wrap;
+}
+
 .db-greeting {
-  margin-bottom: 8px;
+  flex: 1;
+  min-width: 280px;
+}
+
+.db-quote-card {
+  background: rgba(99, 102, 241, 0.05);
+  border: 1px solid rgba(99, 102, 241, 0.1);
+  padding: 16px 20px;
+  border-radius: 18px;
+  max-width: 400px;
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.quote-icon {
+  position: absolute;
+  top: -10px;
+  right: 15px;
+  font-size: 1.5rem;
+  color: var(--accent-1);
+  opacity: 0.2;
+}
+
+.quote-text {
+  font-size: 0.95rem;
+  font-weight: 500;
+  line-height: 1.4;
+  color: var(--text-primary);
+  margin: 0;
+}
+
+.quote-author {
+  font-size: 0.8rem;
+  color: var(--text-muted);
+  font-style: italic;
 }
 
 .db-greeting h1 {
@@ -160,6 +204,74 @@
   color: var(--text-muted);
   font-style: italic;
   padding: 10px 0;
+}
+
+/* ── Pomodoro Timer ── */
+.pomodoro-card {
+  align-items: center;
+  text-align: center;
+}
+
+.pomo-display {
+  font-size: 3rem;
+  font-weight: 800;
+  font-variant-numeric: tabular-nums;
+  color: var(--text-primary);
+  margin: 4px 0;
+  letter-spacing: -0.02em;
+}
+
+.pomo-controls {
+  display: flex;
+  gap: 12px;
+  justify-content: center;
+}
+
+.pomo-btn {
+  width: 48px;
+  height: 38px;
+  border-radius: 12px;
+  border: none;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 1.1rem;
+  transition: all 0.2s;
+}
+
+.pomo-start { background: var(--accent-1); color: white; }
+.pomo-stop { background: #ef4444; color: white; }
+.pomo-reset { background: rgba(255,255,255,0.05); color: var(--text-primary); border: 1px solid var(--border-color); }
+
+.pomo-btn:hover { transform: translateY(-2px); filter: brightness(1.1); }
+
+/* ── Scratchpad ── */
+.scratchpad-card {
+  padding-bottom: 12px;
+}
+
+.scratch-area {
+  width: 100%;
+  height: 100px;
+  background: rgba(0,0,0,0.2);
+  border: 1px solid var(--border-color);
+  border-radius: 12px;
+  padding: 12px;
+  color: var(--text-primary);
+  font-size: 0.9rem;
+  resize: none;
+  line-height: 1.5;
+  transition: border-color 0.2s;
+}
+
+.scratch-area:focus {
+  outline: none;
+  border-color: var(--accent-1);
+}
+
+[data-theme="light"] .scratch-area {
+  background: rgba(255,255,255,0.8);
 }
 
 /* ── Actions ── */

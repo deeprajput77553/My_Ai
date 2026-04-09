@@ -1,5 +1,6 @@
 import { useState, useEffect, useCallback, useRef } from "react";
 import { getUserData, addReminder, updateReminder, deleteReminder } from "../api";
+import { useSettings } from "../contexts/SettingsContext";
 import "./RemindersPanel.css";
 
 const CAT_COLORS = {
@@ -21,6 +22,52 @@ function daysUntil(d) {
   if (!d) return null;
   return Math.ceil((new Date(d) - Date.now()) / 86400000);
 }
+
+// ── Audio Ringtone Synthesizer ───────────────────────────────────────────────
+const playRingtone = (type, customSrc) => {
+  try {
+    const audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+    if (type === "chime") {
+      const osc1 = audioCtx.createOscillator();
+      const osc2 = audioCtx.createOscillator();
+      const gain = audioCtx.createGain();
+      osc1.frequency.value = 523.25; // C5
+      osc2.frequency.value = 659.25; // E5
+      gain.gain.setValueAtTime(0, audioCtx.currentTime);
+      gain.gain.linearRampToValueAtTime(0.3, audioCtx.currentTime + 0.1);
+      gain.gain.exponentialRampToValueAtTime(0.001, audioCtx.currentTime + 2);
+      osc1.connect(gain); osc2.connect(gain); gain.connect(audioCtx.destination);
+      osc1.start(); osc2.start();
+      osc1.stop(audioCtx.currentTime + 2); osc2.stop(audioCtx.currentTime + 2);
+    } else if (type === "bell") {
+      const osc = audioCtx.createOscillator();
+      const gain = audioCtx.createGain();
+      osc.type = "sine";
+      osc.frequency.setValueAtTime(800, audioCtx.currentTime);
+      osc.frequency.exponentialRampToValueAtTime(400, audioCtx.currentTime + 1);
+      gain.gain.setValueAtTime(0.5, audioCtx.currentTime);
+      gain.gain.exponentialRampToValueAtTime(0.01, audioCtx.currentTime + 1.5);
+      osc.connect(gain); gain.connect(audioCtx.destination);
+      osc.start(); osc.stop(audioCtx.currentTime + 1.5);
+    } else if (type === "digital") {
+      const osc = audioCtx.createOscillator();
+      const gain = audioCtx.createGain();
+      osc.type = "square";
+      osc.frequency.setValueAtTime(1000, audioCtx.currentTime);
+      osc.frequency.setValueAtTime(1200, audioCtx.currentTime + 0.1);
+      osc.frequency.setValueAtTime(1000, audioCtx.currentTime + 0.2);
+      gain.gain.setValueAtTime(0.1, audioCtx.currentTime);
+      gain.gain.setValueAtTime(0, audioCtx.currentTime + 0.3);
+      osc.connect(gain); gain.connect(audioCtx.destination);
+      osc.start(); osc.stop(audioCtx.currentTime + 0.3);
+    } else if (type === "custom" && customSrc) {
+      const audio = new Audio(customSrc);
+      audio.play().catch(e => console.error("Custom audio play failed:", e));
+    }
+  } catch (e) {
+    console.error("Audio playback error:", e);
+  }
+};
 
 // ── In-App Toast Notification ─────────────────────────────────────────────────
 function Toast({ toasts, removeToast }) {
@@ -208,6 +255,7 @@ function LiveCountdown({ dueDate, completed }) {
 
 // ── Main Panel ────────────────────────────────────────────────────────────────
 function RemindersPanel() {
+  const { settings } = useSettings();
   const [userData, setUserData]     = useState({ reminders: [] });
   const [loadingData, setLoadingData] = useState(true);
   const [showAdd, setShowAdd]       = useState(false);
@@ -234,9 +282,16 @@ function RemindersPanel() {
   // ── Auto-request permission on mount if not decided yet ─────────────────────
   useEffect(() => {
     if ("Notification" in window && Notification.permission === "default") {
-      Notification.requestPermission().then(p => setNotifPermission(p));
+      // Browsers often block auto-requests without user gesture, but we can try
+      try { Notification.requestPermission().then(p => setNotifPermission(p)); } catch(e) { console.error(e); }
     }
   }, []);
+
+  const requestNotificationAction = async () => {
+    if (!("Notification" in window)) return alert("Browser does not support notifications");
+    const p = await Notification.requestPermission();
+    setNotifPermission(p);
+  };
 
   // ── Schedule both browser + in-app notifications ────────────────────────────
   useEffect(() => {
@@ -270,7 +325,7 @@ function RemindersPanel() {
       }
 
       // ── Browser notifications (scheduled) ──────────────────────────────────
-      if (!granted) return;
+      if (!granted || !settings.notificationsEnabled) return;
 
       // 1 day before
       const msBefore = msUntil - 24 * 60 * 60 * 1000;
@@ -298,6 +353,7 @@ function RemindersPanel() {
       // At exact time
       if (msUntil > 0 && msUntil < MAX_SCHEDULE) {
         notifTimers.current.push(setTimeout(() => {
+          playRingtone(settings.ringtone || "chime", settings.customRingtone);
           new Notification(`Due now: ${r.title}`, {
             body: r.description || "Time's up!",
             icon: "/favicon.ico",
@@ -309,7 +365,7 @@ function RemindersPanel() {
 
     return () => notifTimers.current.forEach(clearTimeout);
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [userData.reminders, notifPermission]);
+  }, [userData.reminders, notifPermission, settings.notificationsEnabled, settings.ringtone]);
 
   const handleToggleComplete = async (r) => {
     try {
@@ -328,10 +384,10 @@ function RemindersPanel() {
 
   const reminders = userData.reminders || [];
   const filtered = reminders.filter(r => {
-    const days = daysUntil(r.dueDate);
-    if (filter === "upcoming")  return !r.completed && (days === null || days >= 0);
+    const isPast = r.dueDate && new Date(r.dueDate).getTime() < Date.now();
+    if (filter === "upcoming")  return !r.completed && !isPast;
     if (filter === "completed") return r.completed;
-    if (filter === "overdue")   return !r.completed && days !== null && days < 0;
+    if (filter === "overdue")   return !r.completed && isPast;
     return true;
   }).sort((a, b) => {
     if (!a.dueDate) return 1;
@@ -357,10 +413,10 @@ function RemindersPanel() {
           <p>AI auto-detects exams & events from your chats</p>
         </div>
         <div className="rp-header-actions">
-          {notifPermission === "denied" && (
-            <span className="rp-notif-denied" title="Notifications blocked in browser settings">
-              Notifications blocked
-            </span>
+          {(notifPermission === "denied" || notifPermission === "default") && (
+            <button className="rp-notif-denied" onClick={requestNotificationAction} title="Click to Request Permission" style={{ cursor: "pointer" }}>
+              Enable Notifications
+            </button>
           )}
           {notifPermission === "granted" && (
             <span className="rp-notif-on" title="Browser notifications enabled">

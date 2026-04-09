@@ -92,6 +92,25 @@ function SettingsPanel() {
     setTimeout(() => setPwdMsg(null), 3000);
   };
 
+  const handleCustomRingtone = (e) => {
+    const file = e.target.files[0];
+    if (!file) return;
+
+    // Check size (limit to 2MB for localStorage)
+    if (file.size > 2 * 1024 * 1024) {
+      alert("File is too large. Please select a clip under 2MB.");
+      return;
+    }
+
+    const reader = new FileReader();
+    reader.onload = (event) => {
+      const base64 = event.target.result;
+      updateSetting("customRingtone", base64);
+      updateSetting("ringtone", "custom");
+    };
+    reader.readAsDataURL(file);
+  };
+
   return (
     <div className="sp-container">
       <div className="sp-header">
@@ -212,6 +231,51 @@ function SettingsPanel() {
           <ToggleSwitch value={settings.notificationsEnabled} onChange={v => updateSetting("notificationsEnabled", v)} />
         </SettingRow>
 
+        {settings.notificationsEnabled && (
+          <SettingRow icon={<i className="fi fi-rr-music-alt"></i>} label="Ringtone" description="Sound played when a reminder triggers">
+            <div className="sp-ringtone-group">
+              <select
+                className="sp-select"
+                value={settings.ringtone}
+                onChange={e => updateSetting("ringtone", e.target.value)}
+              >
+                <option value="chime">Soft Chime</option>
+                <option value="bell">Bell Ring</option>
+                <option value="digital">Digital Beep</option>
+                {settings.customRingtone && <option value="custom">Custom Audio</option>}
+              </select>
+
+              <div className="sp-custom-manage">
+                {!settings.customRingtone ? (
+                  <label className="sp-add-custom">
+                    <i className="fi fi-rr-plus"></i>
+                    Add Custom
+                    <input type="file" accept="audio/*" onChange={handleCustomRingtone} style={{ display: "none" }} />
+                  </label>
+                ) : (
+                  <div className="sp-custom-actions">
+                    <button className="sp-action-mini" title="Preview" onClick={() => {
+                      const a = new Audio(settings.customRingtone); a.play();
+                    }}>
+                      <i className="fi fi-rr-play"></i>
+                    </button>
+                    <label className="sp-action-mini" title="Change">
+                      <i className="fi fi-rr-refresh"></i>
+                      <input type="file" accept="audio/*" onChange={handleCustomRingtone} style={{ display: "none" }} />
+                    </label>
+                    <button className="sp-action-mini sp-danger-mini" title="Remove" onClick={() => {
+                      updateSetting("customRingtone", null);
+                      if (settings.ringtone === "custom") updateSetting("ringtone", "chime");
+                    }}>
+                      <i className="fi fi-rr-trash"></i>
+                    </button>
+                  </div>
+                )}
+              </div>
+            </div>
+          </SettingRow>
+        )}
+
         <SettingRow icon={<i className="fi fi-rr-volume-up"></i>} label="Voice Auto-Play" description="Automatically speak AI responses">
           <ToggleSwitch value={settings.ttsAutoPlay} onChange={v => updateSetting("ttsAutoPlay", v)} />
         </SettingRow>
@@ -302,7 +366,7 @@ function SettingsPanel() {
       {showDeleteAccount && (
         <div className="sp-confirm-overlay" onClick={() => { setShowDeleteAccount(false); setDeleteError(""); setDeletePassword(""); }}>
           <div className="sp-confirm-modal sp-delete-modal" onClick={e => e.stopPropagation()}>
-            <div className="sp-confirm-icon"><i className="fi fi-rr-shield-exclamation" style={{color: '#ef4444'}}></i></div>
+            <div className="sp-confirm-icon"><i className="fi fi-rr-shield-exclamation" style={{ color: '#ef4444' }}></i></div>
             <h3>Delete Your Account?</h3>
             <p>This will <strong>permanently</strong> delete your account, all chats, notes, reminders, and personal data. This action <strong>cannot be undone</strong>.</p>
             <div className="sp-delete-input-group">

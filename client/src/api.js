@@ -27,9 +27,9 @@ export const getConversation   = (id)   => API.get(`/chat/${id}`);
 export const deleteChat        = (id)   => API.delete(`/chat/${id}`);
 
 // ── Notes ─────────────────────────────────────────
-export const generateNotes          = (prompt)   => API.post("/notes/generate", { prompt });
-export const parseQuestionsFromFile = (text)     => API.post("/notes/parse-questions", { text });
-export const answerQuestion         = (question) => API.post("/notes/answer", { question });
+export const generateNotes          = (prompt, genMode)   => API.post("/notes/generate", { prompt, genMode });
+export const parseQuestionsFromFile = (text, genMode)     => API.post("/notes/parse-questions", { text, genMode });
+export const answerQuestion         = (question, genMode) => API.post("/notes/answer", { question, genMode });
 
 // ── User Data ──────────────────────────────────────
 export const getUserData        = ()         => API.get("/userdata");

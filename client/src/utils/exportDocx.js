@@ -10,6 +10,12 @@ import {
   WidthType,
   BorderStyle,
   AlignmentType,
+  PageBreak,
+  Header,
+  Footer,
+  PageNumber,
+  TabStopType,
+  TabStopPosition
 } from "docx";
 import { saveAs } from "file-saver";
 
@@ -22,26 +28,15 @@ const parseInline = (text) => {
   let match;
 
   while ((match = regex.exec(text)) !== null) {
-    // Plain text before the match
     if (match.index > lastIndex) {
       runs.push(new TextRun({ text: text.slice(lastIndex, match.index) }));
     }
-
-    if (match[2]) {
-      // **bold**
-      runs.push(new TextRun({ text: match[2], bold: true }));
-    } else if (match[3]) {
-      // *italic*
-      runs.push(new TextRun({ text: match[3], italics: true }));
-    } else if (match[4]) {
-      // `code`
-      runs.push(new TextRun({ text: match[4], font: "Courier New" }));
-    }
-
+    if (match[2]) runs.push(new TextRun({ text: match[2], bold: true }));
+    else if (match[3]) runs.push(new TextRun({ text: match[3], italics: true }));
+    else if (match[4]) runs.push(new TextRun({ text: match[4], font: "Courier New" }));
     lastIndex = regex.lastIndex;
   }
 
-  // Remaining plain text
   if (lastIndex < text.length) {
     runs.push(new TextRun({ text: text.slice(lastIndex) }));
   }
@@ -49,7 +44,6 @@ const parseInline = (text) => {
   return runs.length > 0 ? runs : [new TextRun({ text })];
 };
 
-// Convert markdown string → docx Paragraph/Table array
 const markdownToDocxElements = (markdown) => {
   const lines = markdown.split("\n");
   const elements = [];
@@ -58,94 +52,41 @@ const markdownToDocxElements = (markdown) => {
   while (i < lines.length) {
     const line = lines[i];
 
-    // H1
-    if (line.startsWith("# ")) {
-      elements.push(new Paragraph({
-        text: line.slice(2),
-        heading: HeadingLevel.HEADING_1,
-      }));
-
-    // H2
+    if (line.includes("---PAGEBREAK---")) {
+      elements.push(new Paragraph({ children: [new PageBreak()] }));
+    }
+    else if (line.startsWith("# ")) {
+      elements.push(new Paragraph({ text: line.slice(2), heading: HeadingLevel.HEADING_1 }));
     } else if (line.startsWith("## ")) {
-      elements.push(new Paragraph({
-        text: line.slice(3),
-        heading: HeadingLevel.HEADING_2,
-      }));
-
-    // H3
+      elements.push(new Paragraph({ text: line.slice(3), heading: HeadingLevel.HEADING_2 }));
     } else if (line.startsWith("### ")) {
-      elements.push(new Paragraph({
-        text: line.slice(4),
-        heading: HeadingLevel.HEADING_3,
-      }));
-
-    // Bullet list
+      elements.push(new Paragraph({ text: line.slice(4), heading: HeadingLevel.HEADING_3 }));
     } else if (line.startsWith("- ") || line.startsWith("* ")) {
-      elements.push(new Paragraph({
-        children: parseInline(line.slice(2)),
-        bullet: { level: 0 },
-      }));
-
-    // Numbered list
+      elements.push(new Paragraph({ children: parseInline(line.slice(2)), bullet: { level: 0 } }));
     } else if (/^\d+\. /.test(line)) {
-      const text = line.replace(/^\d+\. /, "");
-      elements.push(new Paragraph({
-        children: parseInline(text),
-        numbering: { reference: "default-numbering", level: 0 },
-      }));
-
-    // Blockquote
+      elements.push(new Paragraph({ children: parseInline(line.replace(/^\d+\. /, "")), numbering: { reference: "default-numbering", level: 0 } }));
     } else if (line.startsWith("> ")) {
-      elements.push(new Paragraph({
-        children: [new TextRun({ text: line.slice(2), italics: true, color: "666666" })],
-        indent: { left: 720 },
-      }));
-
-    // Horizontal rule
+      elements.push(new Paragraph({ children: [new TextRun({ text: line.slice(2), italics: true, color: "666666" })], indent: { left: 720 } }));
     } else if (line.startsWith("---") || line.startsWith("***")) {
-      elements.push(new Paragraph({
-        border: { bottom: { color: "cccccc", style: BorderStyle.SINGLE, size: 6 } },
-        text: "",
-      }));
-
-    // Table — detect by | at start
+      elements.push(new Paragraph({ border: { bottom: { color: "cccccc", style: BorderStyle.SINGLE, size: 6 } }, text: "" }));
     } else if (line.startsWith("|")) {
       const tableLines = [];
       while (i < lines.length && lines[i].startsWith("|")) {
-        // skip separator rows like |---|---|
-        if (!/^\|[\s\-|:]+\|$/.test(lines[i])) {
-          tableLines.push(lines[i]);
-        }
+        if (!/^\|[\s\-|:]+\|$/.test(lines[i])) tableLines.push(lines[i]);
         i++;
       }
-
       const rows = tableLines.map((tl, rowIndex) => {
-        const cells = tl.split("|").filter((c) => c.trim() !== "");
         return new TableRow({
-          children: cells.map((cell) =>
+          children: tl.split("|").filter((c) => c.trim() !== "").map((cell) =>
             new TableCell({
-              children: [new Paragraph({
-                children: parseInline(cell.trim()),
-                alignment: AlignmentType.LEFT,
-              })],
-              shading: rowIndex === 0
-                ? { fill: "e0f2fe" }   // header row light blue
-                : { fill: "ffffff" },
+              children: [new Paragraph({ children: parseInline(cell.trim()), alignment: AlignmentType.LEFT })],
+              shading: rowIndex === 0 ? { fill: "e0f2fe" } : { fill: "ffffff" },
             })
           ),
         });
       });
-
-      if (rows.length > 0) {
-        elements.push(new Table({
-          rows,
-          width: { size: 100, type: WidthType.PERCENTAGE },
-        }));
-      }
-
-      continue; // i already advanced inside the while loop above
-
-    // Code block
+      if (rows.length > 0) elements.push(new Table({ rows, width: { size: 100, type: WidthType.PERCENTAGE } }));
+      continue;
     } else if (line.startsWith("```")) {
       i++;
       const codeLines = [];
@@ -153,47 +94,83 @@ const markdownToDocxElements = (markdown) => {
         codeLines.push(lines[i]);
         i++;
       }
-      codeLines.forEach((cl) => {
-        elements.push(new Paragraph({
-          children: [new TextRun({ text: cl, font: "Courier New", size: 20 })],
-          shading: { fill: "f1f5f9" },
-          indent: { left: 360 },
-        }));
-      });
-
-    // Empty line → spacer
+      codeLines.forEach((cl) => elements.push(new Paragraph({ children: [new TextRun({ text: cl, font: "Courier New", size: 20 })], shading: { fill: "f1f5f9" }, indent: { left: 360 } })));
     } else if (line.trim() === "") {
       elements.push(new Paragraph({ text: "" }));
-
-    // Normal paragraph
     } else {
       elements.push(new Paragraph({ children: parseInline(line) }));
     }
-
     i++;
   }
-
   return elements;
 };
 
-export const exportToDocx = async (markdown, filename = "notes") => {
+export const exportToDocx = async (markdown, filename = "notes", config = {}) => {
   try {
+    const headerAlignMap = {
+      "left": AlignmentType.LEFT,
+      "center": AlignmentType.CENTER,
+      "right": AlignmentType.RIGHT
+    };
+    
+    const hAlign = headerAlignMap[config.headerAlign] || AlignmentType.RIGHT;
+    const fAlign = headerAlignMap[config.pageNumAlign] || AlignmentType.CENTER;
+
+    const sectionsData = {
+      properties: {
+        page: config.borders ? {
+          borders: {
+            pageBorders: {
+              display: "allPages",
+              left: { style: BorderStyle.SINGLE, size: 6, color: "aaaaaa" },
+              right: { style: BorderStyle.SINGLE, size: 6, color: "aaaaaa" },
+              top: { style: BorderStyle.SINGLE, size: 6, color: "aaaaaa" },
+              bottom: { style: BorderStyle.SINGLE, size: 6, color: "aaaaaa" }
+            }
+          }
+        } : {}
+      },
+      headers: {
+        default: new Header({
+          children: [
+            new Paragraph({
+              alignment: hAlign,
+              children: [
+                new TextRun({ text: config.headerText || "MY AI Generated", bold: true, color: "555555" })
+              ],
+            }),
+            new Paragraph({
+              border: { bottom: { color: "cccccc", style: BorderStyle.SINGLE, size: 6 } }, text: ""
+            })
+          ],
+        }),
+      },
+      children: markdownToDocxElements(markdown),
+    };
+
+    if (config.pageNumbers) {
+      sectionsData.footers = {
+        default: new Footer({
+          children: [
+            new Paragraph({
+              alignment: fAlign,
+              children: [
+                new TextRun("Page "),
+                new TextRun({ children: [PageNumber.CURRENT] }),
+                new TextRun(" of "),
+                new TextRun({ children: [PageNumber.TOTAL_PAGES] }),
+              ],
+            }),
+          ],
+        }),
+      };
+    }
+
     const doc = new Document({
       numbering: {
-        config: [{
-          reference: "default-numbering",
-          levels: [{
-            level: 0,
-            format: "decimal",
-            text: "%1.",
-            alignment: AlignmentType.LEFT,
-          }],
-        }],
+        config: [{ reference: "default-numbering", levels: [{ level: 0, format: "decimal", text: "%1.", alignment: AlignmentType.LEFT }] }],
       },
-      sections: [{
-        properties: {},
-        children: markdownToDocxElements(markdown),
-      }],
+      sections: [sectionsData],
     });
 
     const blob = await Packer.toBlob(doc);

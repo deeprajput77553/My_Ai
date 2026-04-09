@@ -9,7 +9,7 @@ const ANSWER_SYSTEM = `You are an expert tutor and examiner. You give complete, 
 // ── Generate Notes ─────────────────────────────────────────────────────────────
 export const generateNotes = async (req, res) => {
   try {
-    const { prompt } = req.body;
+    const { prompt, genMode } = req.body;
 
     const [searchResults, images] = await Promise.all([
       combinedSearch(prompt),
@@ -20,6 +20,22 @@ export const generateNotes = async (req, res) => {
       ? `\n--- Web context ---\n` + searchResults.map((r) => `[${r.source}] ${r.title}: ${r.snippet}`).join("\n")
       : "";
 
+    let modeRules = "";
+    if (genMode === "practical") {
+      modeRules = `
+PRACTICAL MODE RULES:
+- Focus extensively on executable code and real-world implementation.
+- Provide FULL, complete code inside a single large code block where possible.
+- Provide a detailed explanation/description of the code logic (optional pieces of code can be explained separately).
+`;
+    } else {
+      modeRules = `
+ASSIGNMENT MODE RULES:
+- Be exhaustive — cover history, theory, examples, definitions, and common mistakes.
+- Use extensive bullet points, sections, and clear grading-friendly structures.
+`;
+    }
+
     const notesPrompt = `${NOTES_SYSTEM}
 ${webContext}
 
@@ -29,13 +45,14 @@ STRICT FORMAT RULES:
 - # Main title
 - ## Major sections (at least 4-6 sections)
 - ### Subsections where needed
+${modeRules}
 - **Bold** key terms (NEVER use code blocks for simple text)
 - Use bullet points (- ) and numbered lists for clarity
 - Use tables (| Col | Col |) for any comparison
+- ADD GRAPHS: Use ASCII charts (e.g., flowcharts, bar graphs, node trees) to visually map out difficult concepts or workflows wherever useful in the notes.
 - Use > blockquotes for important tips or hints
 - Use \`\`\`info code blocks ONLY for the final "Summary" or "Key Takeaways" section.
 - Use \`\`\`language blocks ONLY for actual multi-line code snippets
-- Be exhaustive — cover history, theory, examples, and common mistakes
 - ## Summary at the end inside an \`\`\`info block
 `;
 
@@ -50,7 +67,7 @@ STRICT FORMAT RULES:
 // ── Parse Questions from File ──────────────────────────────────────────────────
 export const parseQuestions = async (req, res) => {
   try {
-    const { text } = req.body;
+    const { text, genMode } = req.body;
 
     const parsePrompt = `You are a curriculum designer. Analyze the text below and extract a list of the most important questions, topics, or key concepts that should be explained in detail.
 Focus on identifying:
@@ -89,7 +106,7 @@ ${text.slice(0, 5000)}`;
 // ── Answer Single Question ─────────────────────────────────────────────────────
 export const answerQuestion = async (req, res) => {
   try {
-    const { question } = req.body;
+    const { question, genMode } = req.body;
 
     const [searchResults, images] = await Promise.all([
       combinedSearch(question),
@@ -100,6 +117,22 @@ export const answerQuestion = async (req, res) => {
       ? `\n--- Web context ---\n` + searchResults.map((r) => `[${r.source}] ${r.title}: ${r.snippet}`).join("\n") + "\n"
       : "";
 
+    let modeRules = "";
+    if (genMode === "practical") {
+      modeRules = `
+PRACTICAL MODE RULES:
+- Focus heavily on executable code and real-world implementation.
+- Provide FULL, complete, runnable code inside a code block.
+- Follow up with detailed code explanations.
+`;
+    } else {
+      modeRules = `
+ASSIGNMENT MODE RULES:
+- Provide exhaustive theory, history, and textual context.
+- Format for a strict grader.
+`;
+    }
+
     const answerPrompt = `${ANSWER_SYSTEM}
 ${webContext}
 
@@ -107,9 +140,11 @@ Answer this question completely and in full detail: "${question}"
 
 FORMAT RULES:
 - Use ## headings to organize your answer into clear sections
+${modeRules}
 - Use **bold** for key terms (NEVER use code blocks for simple text)
 - Use bullet points and numbered lists for clarity
 - Include a comparison table if relevant
+- ADD GRAPHS: Draw ASCII diagrams (trees, flows, UI layouts) wherever it helps explain the answer visually.
 - Use \`code blocks\` ONLY for actual code, formulas, or commands.
 - Wrap the final "Key Takeaways" section in an \`\`\`info block for a cleaner look.
 - Do NOT cut the answer short — cover every aspect

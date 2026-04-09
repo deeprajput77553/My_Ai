@@ -41,11 +41,30 @@ function Dashboard({ onNavigate }) {
     day: 'numeric' 
   });
 
+  const quotes = [
+    { text: "Your limit is only your imagination.", author: "Unknown" },
+    { text: "Push yourself, because no one else is going to do it for you.", author: "Unknown" },
+    { text: "Great things never come from comfort zones.", author: "Unknown" },
+    { text: "Dream it. Wish it. Do it.", author: "Unknown" },
+    { text: "Success doesn’t just find you. You have to go out and get it.", author: "Unknown" },
+    { text: "The harder you work for something, the greater you’ll feel when you achieve it.", author: "Unknown" },
+    { text: "Wake up with determination. Go to bed with satisfaction.", author: "Unknown" },
+    { text: "Do something today that your future self will thank you for.", author: "Unknown" }
+  ];
+  const dailyQuote = quotes[dateObj.getDate() % quotes.length];
+
   return (
     <div className="db-container">
-      <div className="db-greeting">
-        <div className="db-date">{formattedDate}</div>
-        <h1>{greeting}, {user?.name || "Sir"}</h1>
+      <div className="db-greeting-container">
+        <div className="db-greeting">
+          <div className="db-date">{formattedDate}</div>
+          <h1>{greeting}, {user?.name || "Sir"}</h1>
+        </div>
+        <div className="db-quote-card">
+          <i className="fi fi-sr-quote-right quote-icon"></i>
+          <p className="quote-text">"{dailyQuote.text}"</p>
+          <span className="quote-author">— {dailyQuote.author}</span>
+        </div>
       </div>
 
       <div className="db-grid">
@@ -103,6 +122,12 @@ function Dashboard({ onNavigate }) {
             <div className="db-empty-state">No upcoming reminders</div>
           )}
         </div>
+
+        {/* Pomodoro Timer Card */}
+        <PomodoroTimer />
+
+        {/* Scratchpad Card */}
+        <Scratchpad />
       </div>
 
       <div className="db-actions">
@@ -133,6 +158,85 @@ function Dashboard({ onNavigate }) {
           </button>
         </div>
       </div>
+    </div>
+  );
+}
+
+function PomodoroTimer() {
+  const [minutes, setMinutes] = useState(25);
+  const [seconds, setSeconds] = useState(0);
+  const [isActive, setIsActive] = useState(false);
+  const [mode, setMode] = useState("work"); // work | break
+
+  useEffect(() => {
+    let interval = null;
+    if (isActive) {
+      interval = setInterval(() => {
+        if (seconds > 0) {
+          setSeconds(seconds - 1);
+        } else if (minutes > 0) {
+          setMinutes(minutes - 1);
+          setSeconds(59);
+        } else {
+          setIsActive(false);
+          // Play a small notification or switch mode
+          if (mode === "work") { setMode("break"); setMinutes(5); }
+          else { setMode("work"); setMinutes(25); }
+        }
+      }, 1000);
+    } else {
+      clearInterval(interval);
+    }
+    return () => clearInterval(interval);
+  }, [isActive, minutes, seconds, mode]);
+
+  const toggle = () => setIsActive(!isActive);
+  const reset = () => {
+    setIsActive(false);
+    setMinutes(mode === "work" ? 25 : 5);
+    setSeconds(0);
+  };
+
+  return (
+    <div className="db-card pomodoro-card">
+      <div className="db-card-header">
+        <i className="fi fi-rr-stopwatch"></i> {mode === "work" ? "Focus Mode" : "Break Time"}
+      </div>
+      <div className="pomo-display">
+        {String(minutes).padStart(2, "0")}:{String(seconds).padStart(2, "0")}
+      </div>
+      <div className="pomo-controls">
+        <button onClick={toggle} className={`pomo-btn ${isActive ? 'pomo-stop' : 'pomo-start'}`}>
+          {isActive ? <i className="fi fi-sr-pause"></i> : <i className="fi fi-sr-play"></i>}
+        </button>
+        <button onClick={reset} className="pomo-btn pomo-reset">
+          <i className="fi fi-rr-refresh"></i>
+        </button>
+      </div>
+    </div>
+  );
+}
+
+function Scratchpad() {
+  const [content, setContent] = useState(() => localStorage.getItem("ai_scratchpad") || "");
+  
+  const handleChange = (e) => {
+    const val = e.target.value;
+    setContent(val);
+    localStorage.setItem("ai_scratchpad", val);
+  };
+
+  return (
+    <div className="db-card scratchpad-card">
+      <div className="db-card-header">
+        <i className="fi fi-rr-clipboard"></i> Quick Scratchpad
+      </div>
+      <textarea 
+        className="scratch-area" 
+        placeholder="Type quick thoughts or to-dos here... (Autosaves)" 
+        value={content}
+        onChange={handleChange}
+      />
     </div>
   );
 }

@@ -610,3 +610,73 @@
   border-color: #e2e8f0;
   color: #1e293b;
 }
+
+/* Custom Ringtone Styles */
+.sp-ringtone-group {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+.sp-custom-manage {
+  display: flex;
+  align-items: center;
+}
+.sp-add-custom {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 12px;
+  background: rgba(99, 102, 241, 0.1);
+  border: 1px solid rgba(99, 102, 241, 0.2);
+  border-radius: 10px;
+  cursor: pointer;
+  font-size: 11px;
+  font-weight: 700;
+  color: #a5b4fc;
+  transition: all 0.2s;
+  white-space: nowrap;
+}
+.sp-add-custom:hover {
+  background: rgba(99, 102, 241, 0.2);
+  transform: scale(1.02);
+}
+.sp-custom-actions {
+  display: flex;
+  gap: 8px;
+  background: rgba(255, 255, 255, 0.04);
+  padding: 4px;
+  border-radius: 10px;
+  border: 1px solid var(--border-color);
+}
+.sp-action-mini {
+  width: 28px;
+  height: 28px;
+  border-radius: 8px;
+  border: none;
+  background: transparent;
+  color: var(--text-secondary);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  transition: all 0.2s;
+  font-size: 12px;
+}
+.sp-action-mini:hover {
+  background: rgba(255, 255, 255, 0.08);
+  color: white;
+}
+.sp-danger-mini:hover {
+  background: rgba(239, 68, 68, 0.15);
+  color: #ef4444;
+}
+
+[data-theme="light"] .sp-add-custom {
+  background: #f5f3ff;
+  border-color: #c7d2fe;
+  color: #4f46e5;
+}
+[data-theme="light"] .sp-custom-actions {
+  background: #f8fafc;
+  border-color: #e2e8f0;
+}

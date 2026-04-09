@@ -64,7 +64,35 @@ function Notes({ onNotesSaved, preloadedNote }) {
   const [activeQ, setActiveQ]           = useState(null);
   const [qaLoading, setQaLoading]       = useState(false);
   const [mode, setMode]                 = useState("notes"); // notes, preview, qa
+  const [genMode, setGenMode]           = useState("assignment"); // assignment, practical
   const [isGeneratingAll, setIsGeneratingAll] = useState(false);
+  
+  // Export Modal State
+  const [exportTarget, setExportTarget] = useState(null); // { type: 'pdf'|'docx', ref: any, content: string, filename: string }
+  const [exportConfig, setExportConfig] = useState({
+    headerText: "MY AI Document generated",
+    headerAlign: "right", // left, center, right
+    pageNumbers: true,
+    pageNumAlign: "center", // left, center, right
+    borders: true
+  });
+
+  const triggerExport = (type, ref, content, filename) => {
+    setExportTarget({ type, ref, content, filename });
+  };
+
+  const confirmExport = async () => {
+    if (!exportTarget) return;
+    try {
+      if (exportTarget.type === "pdf") {
+        await exportToPdf(exportTarget.ref, exportTarget.filename, exportConfig);
+      } else {
+        await exportToDocx(exportTarget.content, exportTarget.filename, exportConfig);
+      }
+    } catch(e) { console.error(e); }
+    setExportTarget(null);
+  };
+
 
   const fileInputRef = useRef(null);
   const notesRef     = useRef(null);
@@ -100,7 +128,7 @@ function Notes({ onNotesSaved, preloadedNote }) {
           ? `${rawText}\n\nAdditional instruction: ${filePrompt}`
           : rawText;
 
-        const parseRes = await parseQuestionsFromFile(combined);
+        const parseRes = await parseQuestionsFromFile(combined, genMode);
         const parsed   = parseRes.data.questions;
 
         if (parsed.length > 0) {
@@ -109,7 +137,7 @@ function Notes({ onNotesSaved, preloadedNote }) {
           setMode("preview");
         } else {
           // Fallback: treat as notes prompt
-          const res = await generateNotes(combined.slice(0, 1500));
+          const res = await generateNotes(combined.slice(0, 1500), genMode);
           setNotes(res.data.notes);
           setSearchResults(res.data.searchResults || []);
           setImages(res.data.images || []);
@@ -124,7 +152,7 @@ function Notes({ onNotesSaved, preloadedNote }) {
           setAnswers({});
           setMode("preview");
         } else {
-          const res = await generateNotes(prompt);
+          const res = await generateNotes(prompt, genMode);
           setNotes(res.data.notes);
           setSearchResults(res.data.searchResults || []);
           setImages(res.data.images || []);
@@ -159,7 +187,7 @@ function Notes({ onNotesSaved, preloadedNote }) {
     const allAnswers = {};
     for (let i = 0; i < questions.length; i++) {
         try {
-          const res = await answerQuestion(questions[i]);
+          const res = await answerQuestion(questions[i], genMode);
           allAnswers[i] = {
             answer:        res.data.answer,
             searchResults: res.data.searchResults || [],
@@ -192,7 +220,7 @@ function Notes({ onNotesSaved, preloadedNote }) {
     if (answers[index]) return;
     setQaLoading(true);
     try {
-      const res = await answerQuestion(questions[index]);
+      const res = await answerQuestion(questions[index], genMode);
       setAnswers((prev) => ({
         ...prev,
         [index]: {
@@ -220,9 +248,9 @@ function Notes({ onNotesSaved, preloadedNote }) {
 
     questions.forEach((q, i) => {
       if (answers[i]) {
-        combinedContent += `## Answer ${i + 1}\n\n`;
+        if (i > 0) combinedContent += `\n---PAGEBREAK---\n\n`;
+        combinedContent += `## Question ${i + 1}: ${q}\n\n`;
         combinedContent += `${answers[i].answer}\n\n`;
-        combinedContent += `---\n\n`;
       }
     });
 
@@ -233,10 +261,11 @@ function Notes({ onNotesSaved, preloadedNote }) {
       const tempDiv = document.createElement("div");
       tempDiv.innerHTML = `<div class="markdownBody">${combinedContent.replace(/\n/g, "<br>")}</div>`;
       document.body.appendChild(tempDiv);
-      await exportToPdf({ current: tempDiv }, filename);
-      document.body.removeChild(tempDiv);
+      triggerExport("pdf", { current: tempDiv }, null, filename);
+      // Wait for user to interact with modal, we can't delete tempDiv here!
+      // We will leave tempDiv cleanup to the exportPdf function internally, since we passed it in.
     } else {
-      await exportToDocx(combinedContent, filename);
+      triggerExport("docx", null, combinedContent, filename);
     }
   };
 
@@ -304,8 +333,19 @@ function Notes({ onNotesSaved, preloadedNote }) {
           onClick={handleGenerate}
           disabled={loading || (!prompt.trim() && !file)}
         >
-          {loading ? "Discovering…" : "✦ Analyze"}
+          {loading ? "Generating…" : "Generate"}
         </button>
+      </div>
+
+      <div style={{ display: "flex", gap: "12px", marginLeft: "12px", marginBottom: "16px" }}>
+        <label style={{ display: "flex", gap: "6px", alignItems: "center", fontSize: "14px", color: "#cbd5e1", cursor: "pointer" }}>
+          <input type="radio" value="assignment" checked={genMode === "assignment"} onChange={(e) => setGenMode(e.target.value)} />
+          Assignment Mode (Theory & Explanation)
+        </label>
+        <label style={{ display: "flex", gap: "6px", alignItems: "center", fontSize: "14px", color: "#cbd5e1", cursor: "pointer" }}>
+          <input type="radio" value="practical" checked={genMode === "practical"} onChange={(e) => setGenMode(e.target.value)} />
+          Practical Mode (Full Code & Blocks)
+        </label>
       </div>
 
       {/* ── Preview Mode ── */}
@@ -441,8 +481,8 @@ function Notes({ onNotesSaved, preloadedNote }) {
                               setAnswers(newAnswers);
                               handleAnswerQuestion(activeQ);
                             }} title="Regenerate individual answer"><i className="fi fi-rr-refresh"></i> Regenerate</button>
-                          <button className="downloadBtn" onClick={() => exportToPdf(notesRef, `Q${activeQ + 1}_answer`)}>⬇ PDF</button>
-                          <button className="downloadBtn docx" onClick={() => exportToDocx(answers[activeQ].answer, `Q${activeQ + 1}_answer`)}>⬇ DOCX</button>
+                          <button className="downloadBtn" onClick={() => triggerExport("pdf", notesRef, null, `Q${activeQ + 1}_answer`)}>⬇ PDF</button>
+                          <button className="downloadBtn docx" onClick={() => triggerExport("docx", null, answers[activeQ].answer, `Q${activeQ + 1}_answer`)}>⬇ DOCX</button>
                         </div>
                       </div>
                       {/* Code-only: skip explanation wrapper ✅ */}
@@ -495,8 +535,8 @@ function Notes({ onNotesSaved, preloadedNote }) {
                   <div className="downloadBar" style={{ borderBottom: "none", marginBottom: "8px" }}>
                     <div className="downloadBtns" style={{ marginLeft: "auto" }}>
                       <button className="downloadBtn retry-glow" onClick={handleNotesRegenerate} title="Regenerate notes"><i className="fi fi-rr-refresh"></i> Regenerate</button>
-                      <button className="downloadBtn" onClick={() => exportToPdf(notesRef, filename)}>⬇ PDF</button>
-                      <button className="downloadBtn docx" onClick={() => exportToDocx(notes, filename)}>⬇ DOCX</button>
+                      <button className="downloadBtn" onClick={() => triggerExport("pdf", notesRef, null, filename)}>⬇ PDF</button>
+                      <button className="downloadBtn docx" onClick={() => triggerExport("docx", null, notes, filename)}>⬇ DOCX</button>
                     </div>
                   </div>
                   <MdBody content={notes} />
@@ -507,8 +547,8 @@ function Notes({ onNotesSaved, preloadedNote }) {
                     <span className="downloadLabel">📄 Generated Notes</span>
                     <div className="downloadBtns">
                       <button className="downloadBtn retry-glow" onClick={handleNotesRegenerate} title="Regenerate notes"><i className="fi fi-rr-refresh"></i> Regenerate</button>
-                      <button className="downloadBtn" onClick={() => exportToPdf(notesRef, filename)}>⬇ PDF</button>
-                      <button className="downloadBtn docx" onClick={() => exportToDocx(notes, filename)}>⬇ DOCX</button>
+                      <button className="downloadBtn" onClick={() => triggerExport("pdf", notesRef, null, filename)}>⬇ PDF</button>
+                      <button className="downloadBtn docx" onClick={() => triggerExport("docx", null, notes, filename)}>⬇ DOCX</button>
                     </div>
                   </div>
                   <MdBody content={notes} refProp={notesRef} />
@@ -520,6 +560,63 @@ function Notes({ onNotesSaved, preloadedNote }) {
           )}
         </div>
       )}
+
+      {/* ── EXPORT MODAL ── */}
+      {exportTarget && (
+        <div className="exportModalOverlay" onClick={() => setExportTarget(null)}>
+          <div className="exportModal" onClick={(e) => e.stopPropagation()}>
+            <div className="exportModalHeader">
+              <h3>Configure {exportTarget.type.toUpperCase()} Export</h3>
+              <button onClick={() => setExportTarget(null)}>✕</button>
+            </div>
+            
+            <div className="exportModalBody">
+              <label>
+                Header Text:
+                <input type="text" value={exportConfig.headerText} onChange={(e) => setExportConfig({...exportConfig, headerText: e.target.value})} />
+              </label>
+
+              <label>
+                Header Alignment:
+                <select value={exportConfig.headerAlign} onChange={(e) => setExportConfig({...exportConfig, headerAlign: e.target.value})}>
+                  <option value="left">Left</option>
+                  <option value="center">Center</option>
+                  <option value="right">Right</option>
+                </select>
+              </label>
+
+              <label className="checkboxLabel">
+                <input type="checkbox" checked={exportConfig.pageNumbers} onChange={(e) => setExportConfig({...exportConfig, pageNumbers: e.target.checked})} />
+                Include Page Numbers
+              </label>
+
+              {exportConfig.pageNumbers && (
+                <label>
+                  Page Number Alignment:
+                  <select value={exportConfig.pageNumAlign} onChange={(e) => setExportConfig({...exportConfig, pageNumAlign: e.target.value})}>
+                    <option value="left">Left</option>
+                    <option value="center">Center</option>
+                    <option value="right">Right</option>
+                  </select>
+                </label>
+              )}
+
+              <label className="checkboxLabel">
+                <input type="checkbox" checked={exportConfig.borders} onChange={(e) => setExportConfig({...exportConfig, borders: e.target.checked})} />
+                Include Page Borders
+              </label>
+            </div>
+
+            <div className="exportModalFooter">
+              <button className="exportCancelBtn" onClick={() => setExportTarget(null)}>Cancel</button>
+              <button className="exportConfirmBtn" onClick={confirmExport}>
+                 {exportTarget.type === 'pdf' ? <i className="fi fi-sr-file-pdf"></i> : <i className="fi fi-sr-file-word"></i>} Download
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
     </div>
   );
 }

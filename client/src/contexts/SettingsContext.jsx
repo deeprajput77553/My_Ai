@@ -8,6 +8,7 @@ const DEFAULTS = {
   compactMode: false,
   animations: true,
   notificationsEnabled: true,
+  ringtone: "chime",    // "chime" | "bell" | "digital"
   ttsAutoPlay: false,
   userDataLearning: true,
   usageAnalytics: false,
