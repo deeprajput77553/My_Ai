@@ -1383,4 +1383,108 @@ html, body {
 .input-file-badge .file-remove:hover {
   color: #ef4444;
 }
+
+/* ===== ADVANCED FEATURES: AI TOOLBAR & ZEN MODE ===== */
+.aiMsg {
+  position: relative !important;
+  transition: all 0.3s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.aiMsgToolbar {
+  display: flex !important;
+  gap: 8px;
+  margin-top: 12px;
+  padding-top: 10px;
+  border-top: 1px solid rgba(255, 255, 255, 0.05);
+  opacity: 0;
+  transform: translateY(4px);
+  transition: all 0.25s ease;
+}
+
+.aiMsg:hover .aiMsgToolbar {
+  opacity: 1;
+  transform: none;
+}
+
+.aiMsgToolbar button {
+  background: rgba(255, 255, 255, 0.04);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  color: #94a3b8;
+  width: 28px;
+  height: 28px;
+  border-radius: 8px;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: all 0.2s;
+  font-size: 13px;
+}
+
+.aiMsgToolbar button:hover {
+  background: rgba(99, 102, 241, 0.15);
+  border-color: rgba(99, 102, 241, 0.3);
+  color: #a5b4fc;
+  transform: translateY(-1px);
+}
+
+/* Zen Mode Overlay / Modifier */
+.zen-active {
+  background: transparent !important;
+  border-bottom: none !important;
+  backdrop-filter: none !important;
+  -webkit-backdrop-filter: none !important;
+}
+.zen-active .topbar-title,
+.zen-active .model-selector-container,
+.zen-active .topbar-account {
+  opacity: 0.1 !important;
+  pointer-events: none !important;
+  filter: blur(2px);
+  transition: all 0.5s ease;
+}
+.zen-active:hover .topbar-title,
+.zen-active:hover .model-selector-container,
+.zen-active:hover .topbar-account {
+  opacity: 1 !important;
+  filter: none !important;
+  pointer-events: auto !important;
+}
+
+.zen-toggle {
+  width: 34px;
+  height: 34px;
+  border-radius: 10px;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  background: rgba(15, 23, 42, 0.4);
+  color: #64748b;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: all 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+}
+
+.zen-toggle:hover {
+  color: #f1f5f9;
+  border-color: rgba(255, 255, 255, 0.2);
+  transform: scale(1.1);
+}
+
+.zen-toggle.active {
+  background: rgba(56, 189, 248, 0.15);
+  border-color: rgba(56, 189, 248, 0.4);
+  color: #38bdf8;
+  box-shadow: 0 0 15px rgba(56, 189, 248, 0.3);
+}
+
+[data-theme="light"] .aiMsgToolbar button {
+  background: rgba(0, 0, 0, 0.03);
+  border-color: rgba(0, 0, 0, 0.08);
+  color: #475569;
+}
+[data-theme="light"] .aiMsgToolbar button:hover {
+  background: rgba(99, 102, 241, 0.1);
+  color: #4f46e5;
+}
 

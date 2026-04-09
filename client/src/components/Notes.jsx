@@ -1,4 +1,4 @@
-import { useState, useRef } from "react";
+import { useState, useRef, useEffect } from "react";
 import { DragDropContext, Droppable, Draggable } from "@hello-pangea/dnd";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
@@ -22,12 +22,12 @@ const MarkdownComponents = {
     );
     return <CodeBlock className={className}>{children}</CodeBlock>;
   },
-  table:  ({ children }) => <div style={{ overflowX: "auto", margin: "18px 0" }}><table>{children}</table></div>,
-  thead:  ({ children }) => <thead>{children}</thead>,
-  tbody:  ({ children }) => <tbody>{children}</tbody>,
-  tr:     ({ children }) => <tr>{children}</tr>,
-  th:     ({ children }) => <th>{children}</th>,
-  td:     ({ children }) => <td>{children}</td>,
+  table: ({ children }) => <div style={{ overflowX: "auto", margin: "18px 0" }}><table>{children}</table></div>,
+  thead: ({ children }) => <thead>{children}</thead>,
+  tbody: ({ children }) => <tbody>{children}</tbody>,
+  tr: ({ children }) => <tr>{children}</tr>,
+  th: ({ children }) => <th>{children}</th>,
+  td: ({ children }) => <td>{children}</td>,
 };
 
 function MdBody({ content, refProp }) {
@@ -46,27 +46,35 @@ const isCodeOnly = (text = "") => {
   return trimmed.startsWith("```") && trimmed.split("```").length >= 3;
 };
 
-function Notes({ onNotesSaved, preloadedNote }) {
-  const [prompt, setPrompt]             = useState("");
-  const [notes, setNotes]               = useState(preloadedNote?.notes || "");
-  const [loading, setLoading]           = useState(false);
+function Notes({ onNotesSaved, preloadedNote, genMode, setGenMode }) {
+  const [prompt, setPrompt] = useState("");
+  const [notes, setNotes] = useState(preloadedNote?.notes || "");
+  const [loading, setLoading] = useState(false);
   const [searchResults, setSearchResults] = useState([]);
-  const [images, setImages]             = useState([]);
-  const [searchQuery, setSearchQuery]   = useState("");
+  const [images, setImages] = useState([]);
+  const [searchQuery, setSearchQuery] = useState("");
 
   // File state
-  const [file, setFile]                 = useState(null);
-  const [filePrompt, setFilePrompt]     = useState(""); // extra prompt for file ✅
+  const [file, setFile] = useState(null);
+  const [filePrompt, setFilePrompt] = useState(""); // extra prompt for file ✅
 
   // Q&A state
-  const [questions, setQuestions]       = useState([]);
-  const [answers, setAnswers]           = useState({});
-  const [activeQ, setActiveQ]           = useState(null);
-  const [qaLoading, setQaLoading]       = useState(false);
-  const [mode, setMode]                 = useState("notes"); // notes, preview, qa
-  const [genMode, setGenMode]           = useState("assignment"); // assignment, practical
+  const [questions, setQuestions] = useState([]);
+  const [answers, setAnswers] = useState({});
+  const [activeQ, setActiveQ] = useState(null);
+  const [qaLoading, setQaLoading] = useState(false);
+  const [mode, setMode] = useState("notes"); // notes, preview, qa
   const [isGeneratingAll, setIsGeneratingAll] = useState(false);
   
+  // Reload note when preloadedNote changes ✅
+  useEffect(() => {
+    if (preloadedNote) {
+      setNotes(preloadedNote.notes || "");
+      setPrompt(preloadedNote.prompt || "");
+      setMode("notes");
+    }
+  }, [preloadedNote]);
+
   // Export Modal State
   const [exportTarget, setExportTarget] = useState(null); // { type: 'pdf'|'docx', ref: any, content: string, filename: string }
   const [exportConfig, setExportConfig] = useState({
@@ -89,13 +97,14 @@ function Notes({ onNotesSaved, preloadedNote }) {
       } else {
         await exportToDocx(exportTarget.content, exportTarget.filename, exportConfig);
       }
-    } catch(e) { console.error(e); }
+    } catch (e) { console.error(e); }
     setExportTarget(null);
   };
 
 
   const fileInputRef = useRef(null);
-  const notesRef     = useRef(null);
+  const notesRef = useRef(null);
+  const lastSavedContent = useRef(null); // Prevent duplicate saves ✅
 
   const handleFileChange = (e) => {
     const picked = e.target.files[0];
@@ -129,7 +138,7 @@ function Notes({ onNotesSaved, preloadedNote }) {
           : rawText;
 
         const parseRes = await parseQuestionsFromFile(combined, genMode);
-        const parsed   = parseRes.data.questions;
+        const parsed = parseRes.data.questions;
 
         if (parsed.length > 0) {
           setQuestions(parsed);
@@ -142,7 +151,10 @@ function Notes({ onNotesSaved, preloadedNote }) {
           setSearchResults(res.data.searchResults || []);
           setImages(res.data.images || []);
           setSearchQuery(file.name);
-          if (onNotesSaved) onNotesSaved(file.name, res.data.notes);
+          if (onNotesSaved && lastSavedContent.current !== res.data.notes) {
+            onNotesSaved(file.name, res.data.notes);
+            lastSavedContent.current = res.data.notes;
+          }
         }
       } else {
         // Multi-question input handling
@@ -157,7 +169,10 @@ function Notes({ onNotesSaved, preloadedNote }) {
           setSearchResults(res.data.searchResults || []);
           setImages(res.data.images || []);
           setSearchQuery(prompt);
-          if (onNotesSaved) onNotesSaved(prompt, res.data.notes);
+          if (onNotesSaved && lastSavedContent.current !== res.data.notes) {
+            onNotesSaved(prompt, res.data.notes);
+            lastSavedContent.current = res.data.notes;
+          }
         }
       }
     } catch (err) {
@@ -186,24 +201,24 @@ function Notes({ onNotesSaved, preloadedNote }) {
 
     const allAnswers = {};
     for (let i = 0; i < questions.length; i++) {
-        try {
-          const res = await answerQuestion(questions[i], genMode);
-          allAnswers[i] = {
-            answer:        res.data.answer,
-            searchResults: res.data.searchResults || [],
-            images:        res.data.images        || [],
-          };
-          // Update state as we go for better UX
-          setAnswers({...allAnswers});
-        } catch (err) {
-          console.error(`Failed to answer question ${i}:`, err);
-          allAnswers[i] = {
-            answer: "Failed to generate answer.",
-            searchResults: [],
-            images: [],
-          };
-          setAnswers({...allAnswers});
-        }
+      try {
+        const res = await answerQuestion(questions[i], genMode);
+        allAnswers[i] = {
+          answer: res.data.answer,
+          searchResults: res.data.searchResults || [],
+          images: res.data.images || [],
+        };
+        // Update state as we go for better UX
+        setAnswers({ ...allAnswers });
+      } catch (err) {
+        console.error(`Failed to answer question ${i}:`, err);
+        allAnswers[i] = {
+          answer: "Failed to generate answer.",
+          searchResults: [],
+          images: [],
+        };
+        setAnswers({ ...allAnswers });
+      }
     }
     setIsGeneratingAll(false);
     setQaLoading(false);
@@ -224,9 +239,9 @@ function Notes({ onNotesSaved, preloadedNote }) {
       setAnswers((prev) => ({
         ...prev,
         [index]: {
-          answer:        res.data.answer,
+          answer: res.data.answer,
           searchResults: res.data.searchResults || [],
-          images:        res.data.images        || [],
+          images: res.data.images || [],
         },
       }));
     } catch (err) { console.error("Answer failed:", err); }
@@ -254,18 +269,39 @@ function Notes({ onNotesSaved, preloadedNote }) {
       }
     });
 
-    const filename = `${(file?.name || "QA").slice(0, 30).replace(/\s+/g, "_")}_all_questions`;
+    const baseName = (file?.name || "QA").replace(/\.[^/.]+$/, "");
+    const filename = `${baseName.slice(0, 30).replace(/\s+/g, "_")}_all_questions`;
 
     if (format === "pdf") {
-      // Create a temporary div with all content
       const tempDiv = document.createElement("div");
-      tempDiv.innerHTML = `<div class="markdownBody">${combinedContent.replace(/\n/g, "<br>")}</div>`;
+      tempDiv.className = "markdownBody";
+      tempDiv.innerHTML = combinedContent.replace(/\n/g, "<br>");
       document.body.appendChild(tempDiv);
-      triggerExport("pdf", { current: tempDiv }, null, filename);
-      // Wait for user to interact with modal, we can't delete tempDiv here!
-      // We will leave tempDiv cleanup to the exportPdf function internally, since we passed it in.
+      exportToPdf({ current: tempDiv }, filename, exportConfig);
+      setTimeout(() => document.body.removeChild(tempDiv), 5000); // Cleanup later
     } else {
-      triggerExport("docx", null, combinedContent, filename);
+      exportToDocx(combinedContent, filename, exportConfig);
+    }
+  };
+
+  const saveCombinedToHistory = () => {
+    if (Object.keys(answers).length === 0) return;
+    let combinedContent = `# Questions and Answers\n\n`;
+    combinedContent += `Generated from: ${file?.name || "Document"}\n\n`;
+    combinedContent += `---\n\n`;
+    questions.forEach((q, i) => {
+      if (answers[i]) {
+        if (i > 0) combinedContent += `\n---PAGEBREAK---\n\n`;
+        combinedContent += `## Question ${i + 1}: ${q}\n\n`;
+        combinedContent += `${answers[i].answer}\n\n`;
+      }
+    });
+
+    const baseName = (file?.name || "QA").replace(/\.[^/.]+$/, "");
+    const title = `${baseName}_Q_A`;
+    if (onNotesSaved && lastSavedContent.current !== combinedContent) {
+      onNotesSaved(title, combinedContent);
+      lastSavedContent.current = combinedContent;
     }
   };
 
@@ -273,11 +309,20 @@ function Notes({ onNotesSaved, preloadedNote }) {
     if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); handleGenerate(); }
   };
 
-  const filename = (prompt || file?.name || "notes").slice(0, 30).replace(/\s+/g, "_");
+  const getBaseFilename = () => {
+    let name = "notes";
+    if (file?.name) name = file.name.split('.')[0];
+    else if (prompt && prompt.trim()) name = prompt.slice(0, 20);
+    
+    // Remove all special characters
+    const sanitized = name.replace(/[^a-zA-Z0-9]/g, "_");
+    return sanitized || "my_notes"; // Hard fallback
+  };
+  const filename = getBaseFilename();
 
   // Android File Picker often ignores simple extensions, so we conditionally add explicit MIME types for it.
   const isAndroid = /Android/i.test(navigator.userAgent);
-  const acceptTypes = isAndroid 
+  const acceptTypes = isAndroid
     ? "application/pdf,application/vnd.openxmlformats-officedocument.wordprocessingml.document,text/plain,application/json,.pdf,.docx,.txt,.json"
     : ".pdf,.docx,.txt,.json";
 
@@ -328,6 +373,18 @@ function Notes({ onNotesSaved, preloadedNote }) {
           />
         )}
 
+        <div className="notes-mode-picker input-area-mode-picker" data-active={genMode}>
+          <div className="mode-slider-highlight"></div>
+          <label className={`mode-option ${genMode === "assignment" ? "active" : ""}`}>
+            <input type="radio" className="mode-radio-hidden" value="assignment" checked={genMode === "assignment"} onChange={(e) => setGenMode(e.target.value)} />
+            <span className="mode-name">Assignment</span>
+          </label>
+          <label className={`mode-option ${genMode === "practical" ? "active" : ""}`}>
+            <input type="radio" className="mode-radio-hidden" value="practical" checked={genMode === "practical"} onChange={(e) => setGenMode(e.target.value)} />
+            <span className="mode-name">Practical</span>
+          </label>
+        </div>
+
         <button
           className="notesGenerateBtn"
           onClick={handleGenerate}
@@ -337,16 +394,7 @@ function Notes({ onNotesSaved, preloadedNote }) {
         </button>
       </div>
 
-      <div style={{ display: "flex", gap: "12px", marginLeft: "12px", marginBottom: "16px" }}>
-        <label style={{ display: "flex", gap: "6px", alignItems: "center", fontSize: "14px", color: "#cbd5e1", cursor: "pointer" }}>
-          <input type="radio" value="assignment" checked={genMode === "assignment"} onChange={(e) => setGenMode(e.target.value)} />
-          Assignment Mode (Theory & Explanation)
-        </label>
-        <label style={{ display: "flex", gap: "6px", alignItems: "center", fontSize: "14px", color: "#cbd5e1", cursor: "pointer" }}>
-          <input type="radio" value="practical" checked={genMode === "practical"} onChange={(e) => setGenMode(e.target.value)} />
-          Practical Mode (Full Code & Blocks)
-        </label>
-      </div>
+
 
       {/* ── Preview Mode ── */}
       {mode === "preview" && (
@@ -363,15 +411,15 @@ function Notes({ onNotesSaved, preloadedNote }) {
           <DragDropContext onDragEnd={handleDragEnd}>
             <Droppable droppableId="questions-list">
               {(provided) => (
-                <div 
-                  className="previewList" 
-                  {...provided.droppableProps} 
+                <div
+                  className="previewList"
+                  {...provided.droppableProps}
                   ref={provided.innerRef}
                 >
                   {questions.map((q, i) => (
                     <Draggable key={`${q}-${i}`} draggableId={`q-${i}`} index={i}>
                       {(provided, snapshot) => (
-                        <div 
+                        <div
                           className={`previewRow ${snapshot.isDragging ? "dragging" : ""}`}
                           ref={provided.innerRef}
                           {...provided.draggableProps}
@@ -424,6 +472,9 @@ function Notes({ onNotesSaved, preloadedNote }) {
             </div>
             {Object.keys(answers).length > 0 && (
               <div className="downloadAllBtns">
+                <button className="downloadBtn" style={{ background: "rgba(34, 197, 94, 0.15)", color: "#4ade80", border: "1px solid rgba(74, 222, 128, 0.2)" }} onClick={saveCombinedToHistory}>
+                  <i className="fi fi-rr-disk"></i> Save to History
+                </button>
                 <button className="downloadBtn" onClick={() => downloadAllQA("pdf")}>
                   <i className="fi fi-sr-file-pdf"></i> PDF
                 </button>
@@ -448,7 +499,7 @@ function Notes({ onNotesSaved, preloadedNote }) {
                   <span>{questions[activeQ]}</span>
                   {answers[activeQ] && !isGeneratingAll && (
                     <button className="retryBtn" onClick={() => {
-                      const newAnswers = {...answers};
+                      const newAnswers = { ...answers };
                       delete newAnswers[activeQ];
                       setAnswers(newAnswers);
                       handleAnswerQuestion(activeQ);
@@ -464,7 +515,7 @@ function Notes({ onNotesSaved, preloadedNote }) {
 
                 {qaLoading && !answers[activeQ] && (
                   <div className="notesLoading">
-                    <div className="dots"><span/><span/><span/></div>
+                    <div className="dots"><span /><span /><span /></div>
                     <div>Answering question {activeQ + 1}…</div>
                   </div>
                 )}
@@ -476,11 +527,11 @@ function Notes({ onNotesSaved, preloadedNote }) {
                         <span className="downloadLabel">Answer — Q{activeQ + 1}</span>
                         <div className="downloadBtns">
                           <button className="downloadBtn retry-glow" onClick={() => {
-                              const newAnswers = {...answers};
-                              delete newAnswers[activeQ];
-                              setAnswers(newAnswers);
-                              handleAnswerQuestion(activeQ);
-                            }} title="Regenerate individual answer"><i className="fi fi-rr-refresh"></i> Regenerate</button>
+                            const newAnswers = { ...answers };
+                            delete newAnswers[activeQ];
+                            setAnswers(newAnswers);
+                            handleAnswerQuestion(activeQ);
+                          }} title="Regenerate individual answer"><i className="fi fi-rr-refresh"></i> Regenerate</button>
                           <button className="downloadBtn" onClick={() => triggerExport("pdf", notesRef, null, `Q${activeQ + 1}_answer`)}>⬇ PDF</button>
                           <button className="downloadBtn docx" onClick={() => triggerExport("docx", null, answers[activeQ].answer, `Q${activeQ + 1}_answer`)}>⬇ DOCX</button>
                         </div>
@@ -522,7 +573,7 @@ function Notes({ onNotesSaved, preloadedNote }) {
 
           {loading && (
             <div className="notesLoading">
-              <div className="dots"><span/><span/><span/></div>
+              <div className="dots"><span /><span /><span /></div>
               <div>Generating notes…</div>
             </div>
           )}
@@ -569,16 +620,16 @@ function Notes({ onNotesSaved, preloadedNote }) {
               <h3>Configure {exportTarget.type.toUpperCase()} Export</h3>
               <button onClick={() => setExportTarget(null)}>✕</button>
             </div>
-            
+
             <div className="exportModalBody">
               <label>
                 Header Text:
-                <input type="text" value={exportConfig.headerText} onChange={(e) => setExportConfig({...exportConfig, headerText: e.target.value})} />
+                <input type="text" value={exportConfig.headerText} onChange={(e) => setExportConfig({ ...exportConfig, headerText: e.target.value })} />
               </label>
 
               <label>
                 Header Alignment:
-                <select value={exportConfig.headerAlign} onChange={(e) => setExportConfig({...exportConfig, headerAlign: e.target.value})}>
+                <select value={exportConfig.headerAlign} onChange={(e) => setExportConfig({ ...exportConfig, headerAlign: e.target.value })}>
                   <option value="left">Left</option>
                   <option value="center">Center</option>
                   <option value="right">Right</option>
@@ -586,14 +637,14 @@ function Notes({ onNotesSaved, preloadedNote }) {
               </label>
 
               <label className="checkboxLabel">
-                <input type="checkbox" checked={exportConfig.pageNumbers} onChange={(e) => setExportConfig({...exportConfig, pageNumbers: e.target.checked})} />
+                <input type="checkbox" checked={exportConfig.pageNumbers} onChange={(e) => setExportConfig({ ...exportConfig, pageNumbers: e.target.checked })} />
                 Include Page Numbers
               </label>
 
               {exportConfig.pageNumbers && (
                 <label>
                   Page Number Alignment:
-                  <select value={exportConfig.pageNumAlign} onChange={(e) => setExportConfig({...exportConfig, pageNumAlign: e.target.value})}>
+                  <select value={exportConfig.pageNumAlign} onChange={(e) => setExportConfig({ ...exportConfig, pageNumAlign: e.target.value })}>
                     <option value="left">Left</option>
                     <option value="center">Center</option>
                     <option value="right">Right</option>
@@ -602,7 +653,7 @@ function Notes({ onNotesSaved, preloadedNote }) {
               )}
 
               <label className="checkboxLabel">
-                <input type="checkbox" checked={exportConfig.borders} onChange={(e) => setExportConfig({...exportConfig, borders: e.target.checked})} />
+                <input type="checkbox" checked={exportConfig.borders} onChange={(e) => setExportConfig({ ...exportConfig, borders: e.target.checked })} />
                 Include Page Borders
               </label>
             </div>
@@ -610,7 +661,7 @@ function Notes({ onNotesSaved, preloadedNote }) {
             <div className="exportModalFooter">
               <button className="exportCancelBtn" onClick={() => setExportTarget(null)}>Cancel</button>
               <button className="exportConfirmBtn" onClick={confirmExport}>
-                 {exportTarget.type === 'pdf' ? <i className="fi fi-sr-file-pdf"></i> : <i className="fi fi-sr-file-word"></i>} Download
+                {exportTarget.type === 'pdf' ? <i className="fi fi-sr-file-pdf"></i> : <i className="fi fi-sr-file-word"></i>} Download
               </button>
             </div>
           </div>

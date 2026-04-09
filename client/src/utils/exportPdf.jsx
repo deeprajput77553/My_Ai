@@ -1,71 +1,91 @@
 import jsPDF from "jspdf";
 import html2canvas from "html2canvas";
-
-if (typeof window !== "undefined") {
-  window.html2canvas = html2canvas;
-}
+import { saveAs } from "file-saver"; // Use file-saver for better mobile support ✅
 
 export const exportToPdf = async (elementRef, filename = "notes", config = {}) => {
   const element = elementRef.current;
-  if (!element) return;
+  if (!element) return Promise.reject("No element");
 
-  try {
-    const pdf = new jsPDF({
-      orientation: "portrait",
-      unit: "pt",
-      format: "a4",
-    });
+  return new Promise(async (resolve, reject) => {
+    try {
+      // 1. Sanitize filename and ensure a clean base
+      const cleanName = typeof filename === "string" ? filename : "notes";
+      const safeBase = cleanName.replace(/[^a-zA-Z0-9]/g, "_").slice(0, 30);
+      const finalFilename = `${safeBase || "my_ai_notes"}.pdf`;
 
-    // Create a temporary cloned container so we don't mess up the UI width
-    const clone = element.cloneNode(true);
-    clone.style.width = "500px"; // Force fixed width to fit A4 layout
-    clone.style.padding = "0px";
-    clone.style.background = "#0f172a"; // Match dark mode
-    clone.style.color = "#f8fafc";
-    document.body.appendChild(clone);
+      // 2. Create a high-fidelity clone
+      const clone = element.cloneNode(true);
+      
+      Object.assign(clone.style, {
+        width: "650px",
+        position: "fixed",
+        left: "0",
+        top: "0",
+        zIndex: "-9999",
+        background: "white",
+        color: "black",
+        padding: "40px",
+        fontSize: "14px",
+        height: "auto",
+        display: "block",
+        opacity: "1",
+        pointerEvents: "none"
+      });
 
-    await pdf.html(clone, {
-      callback: function (doc) {
-        const totalPages = doc.getNumberOfPages();
-        for (let i = 1; i <= totalPages; i++) {
-          doc.setPage(i);
-          
-          if (config.borders) {
-            doc.setDrawColor(200, 200, 200);
-            doc.setLineWidth(1);
-            doc.rect(15, 15, doc.internal.pageSize.getWidth() - 30, doc.internal.pageSize.getHeight() - 30);
-          }
-          
-          if (config.headerText) {
-            doc.setFontSize(10);
-            doc.setTextColor(150, 150, 150);
-            let hx = 20;
-            if (config.headerAlign === "center") hx = doc.internal.pageSize.getWidth() / 2;
-            else if (config.headerAlign === "right") hx = doc.internal.pageSize.getWidth() - 20;
-            doc.text(config.headerText, hx, 30, { align: config.headerAlign || "left" });
-          }
-          
-          if (config.pageNumbers) {
-            doc.setFontSize(9);
-            doc.setTextColor(150, 150, 150);
-            let fx = doc.internal.pageSize.getWidth() / 2;
-            if (config.pageNumAlign === "left") fx = 20;
-            else if (config.pageNumAlign === "right") fx = doc.internal.pageSize.getWidth() - 20;
-            doc.text(`Page ${i} of ${totalPages}`, fx, doc.internal.pageSize.getHeight() - 25, { align: config.pageNumAlign || "center" });
+      // Add Header if provided in config
+      if (config.headerText) {
+        const headerDiv = document.createElement("div");
+        headerDiv.style.borderBottom = "1px solid #ddd";
+        headerDiv.style.marginBottom = "20px";
+        headerDiv.style.paddingBottom = "10px";
+        headerDiv.style.textAlign = config.headerAlign || "right";
+        headerDiv.style.fontSize = "12px";
+        headerDiv.style.color = "#666";
+        headerDiv.innerText = config.headerText;
+        clone.insertBefore(headerDiv, clone.firstChild);
+      }
+
+      clone.querySelectorAll("*").forEach(el => {
+        el.style.color = "black";
+        el.style.borderColor = "#ddd";
+        el.style.backgroundColor = "transparent";
+      });
+
+      document.body.appendChild(clone);
+
+      // 3. Initialize PDF
+      const pdf = new jsPDF("p", "pt", "a4");
+      
+      // 4. Render to PDF
+      await pdf.html(clone, {
+        html2canvas: { 
+          scale: 0.8, 
+          useCORS: true, 
+          backgroundColor: "#ffffff",
+          logging: false
+        },
+        margin: [40, 40, 40, 40],
+        autoPaging: 'text',
+        x: 0,
+        y: 0,
+        width: 515,
+        windowWidth: 650,
+        callback: function (doc) {
+          try {
+            // Use saveAs for robust cross-browser downloads
+            const pdfBlob = doc.output('blob');
+            saveAs(pdfBlob, finalFilename);
+            
+            document.body.removeChild(clone);
+            resolve();
+          } catch (e) {
+            reject(e);
           }
         }
-        
-        doc.save(`${filename}.pdf`);
-        document.body.removeChild(clone);
-      },
-      margin: [50, 20, 50, 20], // TOP, RIGHT, BOTTOM, LEFT margins to prevent overlap with headers/footers
-      x: 0,
-      y: 0,
-      width: 500, // Width of html
-      windowWidth: 500,
-      autoPaging: 'text', // Instructs the engine to NOT cut text in half!
-    });
-  } catch (err) {
-    console.error("PDF export failed:", err);
-  }
-};
+      });
+    } catch (err) {
+      console.error("PDF generation error:", err);
+      reject(err);
+    }
+  });
+};

@@ -20,6 +20,7 @@ import AdminPanel from "./components/AdminPanel";
 import SplashScreen from "./components/SplashScreen";
 import GlobalNotification from "./components/GlobalNotification";
 import Dashboard from "./components/Dashboard";
+import CommandPalette from "./components/CommandPalette";
 import { extractTextFromFile } from "./utils/fileExtractor";
 import "./App.css";
 
@@ -346,10 +347,22 @@ function App() {
   const [loading, setLoading] = useState(false);
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [typingId, setTypingId] = useState(null);
-  const [notesHistory, setNotesHistory] = useState([]);
+  const [notesHistory, setNotesHistory] = useState(() => {
+    try {
+      const saved = localStorage.getItem("my_ai_notes_history");
+      return saved ? JSON.parse(saved) : [];
+    } catch (e) { return []; }
+  });
   const [activeNotesIndex, setActiveNotesIndex] = useState(null);
   const [loadedNote, setLoadedNote] = useState(null);
+
+  useEffect(() => {
+    localStorage.setItem("my_ai_notes_history", JSON.stringify(notesHistory));
+  }, [notesHistory]);
   const [showSplash, setShowSplash] = useState(true);
+  const [genMode, setGenMode] = useState("assignment");
+  const [zenMode, setZenMode] = useState(false); // Advanced Zen Mode ✅
+  const [isCPOpen, setIsCPOpen] = useState(false); // Command Palette ✅
 
   // File analysis state
   const [file, setFile] = useState(null);
@@ -387,6 +400,18 @@ function App() {
       getChats().then((r) => setConversations(r.data));
     }
   }, [isAuthenticated]);
+
+  // Global Command Palette Listener ✅
+  useEffect(() => {
+    const handleCPTrigger = (e) => {
+      if (e.key === "k" && (e.ctrlKey || e.metaKey)) {
+        e.preventDefault();
+        setIsCPOpen(true);
+      }
+    };
+    window.addEventListener("keydown", handleCPTrigger);
+    return () => window.removeEventListener("keydown", handleCPTrigger);
+  }, []);
 
   useEffect(() => {
     bottomRef.current?.scrollIntoView({ behavior: "smooth" });
@@ -525,6 +550,21 @@ function App() {
 
   const handleKeyDown = (e) => {
     if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); handleSend(); }
+    if (e.key === "k" && (e.ctrlKey || e.metaKey)) { e.preventDefault(); setIsCPOpen(true); }
+  };
+
+  const handleSaveResponseAsNote = (content) => {
+    if (!content) return;
+    const clean = content.replace(/<think>[\s\S]*?<\/think>/g, "").trim();
+    const title = clean.slice(0, 30) + "...";
+    handleNotesSaved(title, clean);
+    setLoadedNote({ prompt: title, notes: clean });
+    setActiveTab("notes");
+  };
+
+  const copyToClipboard = (text) => {
+    navigator.clipboard.writeText(text);
+    // Optionally trigger a notification
   };
 
   const handleNotesSaved = (prompt, notes) => {
@@ -592,7 +632,7 @@ function App() {
       <div className="main">
 
         {/* ── Sticky topbar ── */}
-        <div className="topbar" data-active-tab={activeTab}>
+        <div className={`topbar ${zenMode ? "zen-active" : ""}`} data-active-tab={activeTab}>
           <button className="menuBtn" onClick={() => setSidebarOpen(o => !o)}>☰</button>
           <h2 className="topbar-title">
             {activeTab === "dashboard" && "Home"}
@@ -603,6 +643,13 @@ function App() {
             {activeTab === "settings" && "Settings"}
           </h2>
           <div className="topbar-right">
+            <button 
+              className={`zen-toggle ${zenMode ? "active" : ""}`} 
+              onClick={() => setZenMode(!zenMode)}
+              title="Zen Mode (Focus)"
+            >
+              <i className={zenMode ? "fi fi-sr-eye" : "fi fi-rr-eye-crossed"}></i>
+            </button>
             <ModelSelector value={apiProvider} onChange={setApiProvider} />
             <div className="topbar-account">
               <button
@@ -663,10 +710,16 @@ function App() {
                         <div className="aiRow">
                           <div style={{ display: "flex", flexDirection: "column", maxWidth: "75%", minWidth: 0 }}>
                             <div className="aiMsg" style={{ maxWidth: "100%" }}>
-                              {aiM._displayId === typingId
-                                ? <TypingMessage text={aiM.content} onDone={handleTypingDone} />
-                                : <ParsedAIMessage content={aiM.content} />}
-                            </div>
+                                {aiM._displayId === typingId
+                                  ? <TypingMessage text={aiM.content} onDone={handleTypingDone} />
+                                  : <ParsedAIMessage content={aiM.content} />}
+                                
+                                <div className="aiMsgToolbar">
+                                  <button onClick={() => copyToClipboard(aiM.content)} title="Copy to clipboard"><i className="fi fi-rr-copy"></i></button>
+                                  <button onClick={() => handleSaveResponseAsNote(aiM.content)} title="Save as Note"><i className="fi fi-rr-edit"></i></button>
+                                  <button onClick={() => voice.speak(aiM.content.replace(/<think>[\s\S]*?<\/think>/g, ""))} title="Speak response"><i className="fi fi-rr-volume-up"></i></button>
+                                </div>
+                              </div>
                             {aiM._timestamp && <span className="msg-timestamp">{formatMsgTime(aiM._timestamp)}</span>}
                           </div>
                         </div>
@@ -788,7 +841,7 @@ function App() {
 
           {/* Notes */}
           {activeTab === "notes" && (
-            <Notes onNotesSaved={handleNotesSaved} preloadedNote={loadedNote} />
+            <Notes onNotesSaved={handleNotesSaved} preloadedNote={loadedNote} genMode={genMode} setGenMode={setGenMode} />
           )}
 
           {/* Reminders */}
@@ -804,6 +857,22 @@ function App() {
           {activeTab === "admin" && <AdminPanel />}
         </div>
       </div>
+
+      <CommandPalette 
+        isOpen={isCPOpen} 
+        onClose={() => setIsCPOpen(false)}
+        conversations={conversations}
+        notesHistory={notesHistory}
+        onNavigate={(tab, noteIndex, chatItem) => {
+          setActiveTab(tab);
+          if (noteIndex !== undefined) handleSelectNotes(noteIndex);
+          if (chatItem) handleSelectChat(chatItem);
+        }}
+        onSend={(cmd) => {
+          setActiveTab("chat");
+          setTimeout(() => doSend(cmd), 300);
+        }}
+      />
     </div>
   );
 
