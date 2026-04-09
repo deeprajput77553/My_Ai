@@ -1,6 +1,0 @@
-rm -rf node_modules package-lock.json
-npm cache clean --force
-
-npm install
-
-npm install jspdf@2.5.1 html2canvas@1.4.1 file-saver@2.0.5 docx@9.0.3 mammoth@1.8.0 pdfjs-dist@3.11.174

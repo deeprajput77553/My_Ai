@@ -25,7 +25,6 @@ export const sendMessage = (message, conversationId, apiProvider, learning = tru
 export const getChats          = ()     => API.get("/chat");
 export const getConversation   = (id)   => API.get(`/chat/${id}`);
 export const deleteChat        = (id)   => API.delete(`/chat/${id}`);
-export const transcribeAudio = (formData) => API.post("/audio/transcribe", formData, { headers: { "Content-Type": "multipart/form-data" } });
 
 // ── Notes ─────────────────────────────────────────
 export const generateNotes          = (prompt)   => API.post("/notes/generate", { prompt });
